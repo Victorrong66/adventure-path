@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Victor's World</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Crect x='2' y='0' width='4' height='3' fill='%236c3c1c'/%3E%3Crect x='2' y='2' width='4' height='3' fill='%23f0c08c'/%3E%3Crect x='2' y='5' width='4' height='2' fill='%233c64d8'/%3E%3Crect x='2' y='7' width='4' height='1' fill='%23302018'/%3E%3C/svg%3E">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- ============ MENUS ============ -->
+  <div id="screens">
+    <section id="scr-title" class="screen">
+      <div class="panel center">
+        <button id="btn-settings" class="btn icon-btn corner" title="Settings" aria-label="Settings">
+          <svg viewBox="0 0 9 9" width="22" height="22" shape-rendering="crispEdges" aria-hidden="true" fill="currentColor"><rect x="3" y="0" width="1" height="1"/><rect x="4" y="0" width="1" height="1"/><rect x="5" y="0" width="1" height="1"/><rect x="1" y="1" width="1" height="1"/><rect x="3" y="1" width="1" height="1"/><rect x="4" y="1" width="1" height="1"/><rect x="5" y="1" width="1" height="1"/><rect x="7" y="1" width="1" height="1"/><rect x="1" y="2" width="1" height="1"/><rect x="2" y="2" width="1" height="1"/><rect x="3" y="2" width="1" height="1"/><rect x="4" y="2" width="1" height="1"/><rect x="5" y="2" width="1" height="1"/><rect x="6" y="2" width="1" height="1"/><rect x="7" y="2" width="1" height="1"/><rect x="0" y="3" width="1" height="1"/><rect x="1" y="3" width="1" height="1"/><rect x="2" y="3" width="1" height="1"/><rect x="6" y="3" width="1" height="1"/><rect x="7" y="3" width="1" height="1"/><rect x="8" y="3" width="1" height="1"/><rect x="0" y="4" width="1" height="1"/><rect x="1" y="4" width="1" height="1"/><rect x="2" y="4" width="1" height="1"/><rect x="6" y="4" width="1" height="1"/><rect x="7" y="4" width="1" height="1"/><rect x="8" y="4" width="1" height="1"/><rect x="0" y="5" width="1" height="1"/><rect x="1" y="5" width="1" height="1"/><rect x="2" y="5" width="1" height="1"/><rect x="6" y="5" width="1" height="1"/><rect x="7" y="5" width="1" height="1"/><rect x="8" y="5" width="1" height="1"/><rect x="1" y="6" width="1" height="1"/><rect x="2" y="6" width="1" height="1"/><rect x="3" y="6" width="1" height="1"/><rect x="4" y="6" width="1" height="1"/><rect x="5" y="6" width="1" height="1"/><rect x="6" y="6" width="1" height="1"/><rect x="7" y="6" width="1" height="1"/><rect x="1" y="7" width="1" height="1"/><rect x="3" y="7" width="1" height="1"/><rect x="4" y="7" width="1" height="1"/><rect x="5" y="7" width="1" height="1"/><rect x="7" y="7" width="1" height="1"/><rect x="3" y="8" width="1" height="1"/><rect x="4" y="8" width="1" height="1"/><rect x="5" y="8" width="1" height="1"/></svg>
+        </button>
+        <h1 class="logo">VICTOR'S<br>WORLD</h1>
+        <p class="sub">A co-op monster swarm adventure</p>
+        <div class="title-hero"><canvas id="title-hero" width="14" height="21"></canvas></div>
+        <p id="hello" class="small"></p>
+        <div class="col">
+          <button id="btn-host" class="btn big">Host a World</button>
+          <button id="btn-join" class="btn big">Join a Friend</button>
+          <button id="btn-edit" class="btn">Edit Character</button>
+        </div>
+        <p class="hint">WASD / Arrows move &middot; J or click attack &middot; Space dash &middot; R ready &middot; E shop<br>1 2 3 pick upgrade &middot; Enter chat &middot; M mute &middot; Esc menu</p>
+      </div>
+    </section>
+
+    <section id="scr-char" class="screen hidden">
+      <div class="panel">
+        <h2>Create Your Hero</h2>
+        <div class="creator">
+          <div class="preview-wrap">
+            <canvas id="char-preview" width="56" height="84"></canvas>
+            <div class="row small-gap">
+              <button class="btn tiny" id="rot-left">&#9664;</button>
+              <button class="btn tiny" id="rot-right">&#9654;</button>
+            </div>
+          </div>
+          <div class="options">
+            <label class="field">Name
+              <input id="char-name" maxlength="12" autocomplete="off" placeholder="Your name">
+            </label>
+            <div class="opt" data-k="skin"><span>Skin</span><div class="swatches" id="sw-skin"></div></div>
+            <div class="opt" data-k="hair"><span>Hair</span>
+              <div class="cycler"><button class="btn tiny" data-cyc="hair" data-d="-1">&#9664;</button><b id="lbl-hair"></b><button class="btn tiny" data-cyc="hair" data-d="1">&#9654;</button></div>
+            </div>
+            <div class="opt" data-k="hairColor"><span>Hair Color</span><div class="swatches" id="sw-hairColor"></div></div>
+            <div class="opt" data-k="outfit"><span>Outfit</span>
+              <div class="cycler"><button class="btn tiny" data-cyc="outfit" data-d="-1">&#9664;</button><b id="lbl-outfit"></b><button class="btn tiny" data-cyc="outfit" data-d="1">&#9654;</button></div>
+            </div>
+            <div class="opt" data-k="outfitColor"><span>Outfit Color</span><div class="swatches" id="sw-outfitColor"></div></div>
+            <div class="row">
+              <button class="btn" id="char-random">Random</button>
+              <button class="btn primary" id="char-done">Done</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="scr-settings" class="screen hidden">
+      <div class="panel center">
+        <h2>Settings</h2>
+        <div class="setting">
+          <h3>Monster Face Photo</h3>
+          <p class="small">Pick a photo and every monster wears that face when you host.
+            Friends who join see it too. Only a tiny pixel version is kept, in this browser.</p>
+          <div class="face-row">
+            <img id="set-face-preview" class="face-preview big hidden" alt="Monster face">
+            <span id="set-face-none" class="small">No face set: normal monsters.</span>
+          </div>
+          <div class="row">
+            <label class="btn" for="set-face-file">Choose Photo</label>
+            <input type="file" id="set-face-file" accept="image/*" hidden>
+            <button class="btn hidden" id="set-face-clear">Remove</button>
+          </div>
+          <canvas id="set-face-demo" class="face-demo hidden" width="300" height="64"></canvas>
+        </div>
+        <div class="setting">
+          <h3>Multiplayer Relay</h3>
+          <p class="small">The game already has a built-in relay for friends on other networks
+            (like mobile data). If joining still fails, you can add another TURN relay here.
+            Your invite link shares it with friends.</p>
+          <label class="field">Relay address(es)
+            <textarea id="relay-urls" rows="2" placeholder="turn:relay.example.com:443?transport=tcp" autocomplete="off" spellcheck="false"></textarea>
+          </label>
+          <div class="relay-row">
+            <label class="field">Username <input id="relay-user" autocomplete="off" spellcheck="false"></label>
+            <label class="field">Password <input id="relay-pass" autocomplete="off" spellcheck="false"></label>
+          </div>
+          <p id="relay-state" class="small"></p>
+          <div class="row">
+            <button class="btn primary" id="relay-save">Save Relay</button>
+            <button class="btn hidden" id="relay-clear">Remove</button>
+          </div>
+        </div>
+        <div class="setting">
+          <h3>Sound</h3>
+          <button class="btn" id="set-mute">Sound: On</button>
+        </div>
+        <p id="settings-status" class="status"></p>
+        <button class="btn" data-back>Back</button>
+      </div>
+    </section>
+
+    <section id="scr-host" class="screen hidden">
+      <div class="panel">
+        <h2>Your Worlds</h2>
+        <p class="small">Pick a save to load, or start a new world. Friends join with your room code.</p>
+        <div id="world-list" class="world-list"></div>
+        <div class="row">
+          <input id="new-world-name" maxlength="20" placeholder="New world name" autocomplete="off">
+          <button class="btn primary" id="btn-new-world">New World</button>
+        </div>
+        <div class="row">
+          <label class="btn" for="import-file">Import Save</label>
+          <input type="file" id="import-file" accept=".json,application/json" hidden>
+          <button class="btn" data-back>Back</button>
+        </div>
+        <p id="host-status" class="status"></p>
+      </div>
+    </section>
+
+    <section id="scr-join" class="screen hidden">
+      <div class="panel center">
+        <h2>Join a Friend</h2>
+        <p class="small">Ask the host for their 5-letter room code.</p>
+        <input id="join-code" class="code-input" maxlength="5" placeholder="ABCDE" autocomplete="off">
+        <div class="row">
+          <button class="btn primary" id="btn-join-go">Join</button>
+          <button class="btn" data-back>Back</button>
+        </div>
+        <p id="join-status" class="status"></p>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ IN-GAME HUD ============ -->
+  <div id="hud" class="hidden">
+    <div class="hud-tl" id="hud-tl">
+      <div class="hud-name"><span id="hud-name"></span> <span class="lv">LV <b id="hud-lv">1</b></span></div>
+      <div class="bar hp"><i id="hud-hp"></i><span id="hud-hp-t"></span></div>
+      <div class="bar xp"><i id="hud-xp"></i></div>
+      <div class="gold">&#9679; <b id="hud-gold">0</b> gold</div>
+      <div id="hud-weapons" class="weapons"></div>
+    </div>
+    <div class="hud-tc" id="hud-tc">
+      <div id="hud-wave" class="wave"></div>
+      <div id="hud-phase" class="phase"></div>
+      <div id="boss-bar" class="bar boss hidden"><i id="boss-hp"></i><span>OGRE KING</span></div>
+    </div>
+    <div class="hud-tr" id="hud-tr">
+      <div class="tr-row">
+        <div id="hud-room" class="room"></div>
+        <button id="act-menu" class="btn icon-btn" title="Menu" aria-label="Menu">&#9776;</button>
+      </div>
+      <div id="hud-players" class="plist"></div>
+    </div>
+    <div id="announce" class="announce"></div>
+    <div class="hud-actions">
+      <button id="act-ready" class="btn hidden">Ready (R)</button>
+      <button id="act-shop" class="btn hidden">Shop (E)</button>
+      <button id="act-chat" class="btn">Chat</button>
+    </div>
+    <div class="chat">
+      <div id="chat-log" class="chat-log"></div>
+    </div>
+    <div id="chat-panel" class="chat-panel hidden">
+      <div class="chat-head"><b>Chat</b><button class="btn tiny" id="chat-close">Close</button></div>
+      <div id="chat-history" class="chat-history"></div>
+      <div class="chat-send">
+        <input id="chat-input" maxlength="120" placeholder="Say something..." autocomplete="off">
+        <button class="btn primary" id="chat-send">Send</button>
+      </div>
+    </div>
+    <!-- Level-up screen: in front of everything; the game is paused for everyone while it's up -->
+    <div id="choices" class="choices hidden">
+      <div class="panel center">
+        <div id="choices-title" class="choices-title">LEVEL UP! Pick an upgrade</div>
+        <div id="choice-list" class="choice-list"></div>
+        <p id="choices-wait" class="choices-wait"></p>
+      </div>
+    </div>
+    <div class="touch-pad touch-only">
+      <button id="act-dash" class="pad-btn dash">DASH</button>
+      <button id="act-attack" class="pad-btn attack">ATTACK</button>
+    </div>
+    <div class="stick-hint touch-only"><span>MOVE</span></div>
+    <div id="stick" class="stick"><div id="knob" class="knob"></div></div>
+  </div>
+
+  <div id="shop" class="modal hidden">
+    <div class="panel">
+      <h2>Wandering Merchant</h2>
+      <p class="small">"Gold for power, traveller!" &mdash; You have <b id="shop-gold">0</b> gold.</p>
+      <div id="shop-list" class="shop-list"></div>
+      <button class="btn" id="shop-close">Close</button>
+    </div>
+  </div>
+
+  <div id="menu" class="modal hidden">
+    <div class="panel center">
+      <h2>Paused</h2>
+      <p class="small">(The game keeps running for your friends)</p>
+      <div class="col">
+        <button class="btn" id="menu-resume">Resume</button>
+        <button class="btn" id="menu-invite">Copy Invite Link</button>
+        <button class="btn host-only" id="menu-save">Save World</button>
+        <button class="btn host-only" id="menu-export">Export Save File</button>
+        <div class="face-row host-only">
+          <img id="face-preview" class="face-preview hidden" alt="Monster face">
+          <label class="btn" for="face-file">Monster Face Photo</label>
+          <input type="file" id="face-file" accept="image/*" hidden>
+          <button class="btn tiny hidden" id="menu-face-clear">Reset</button>
+        </div>
+        <button class="btn" id="menu-mute">Mute</button>
+        <button class="btn danger" id="menu-leave">Leave</button>
+      </div>
+      <p id="menu-status" class="status"></p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="js/vendor/peerjs.min.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
