@@ -7,7 +7,7 @@ import { connectRoom, makeCode, normalizeCode } from './net.js';
 import { newWorldSave } from './sim.js';
 import { World } from './world.js';
 import {
-  SKINS, HAIR_STYLES, HAIR_COLORS, OUTFITS, OUTFIT_COLORS, BEARDS, charSprite,
+  SKINS, HAIR_STYLES, HAIR_COLORS, OUTFITS, OUTFIT_COLORS, EXTRAS, charSprite,
   processFacePhoto, setMobFace, monsterSprite,
 } from './sprites.js';
 import {
@@ -114,7 +114,7 @@ $('set-mute').addEventListener('click', () => { audio.toggleMute(); refreshSetti
 
 const demoWorld = new World(12345);
 const demoHeroes = [0, 1, 2, 3].map((i) => ({
-  id: 'd' + i, name: '', look: { skin: (i * 2) % 6, hair: (i * 3) % 8, hairColor: (i * 5) % 8, outfit: i % 6, outfitColor: (i * 3 + 1) % 8, beard: i % 3 },
+  id: 'd' + i, name: '', look: { skin: (i * 2) % 6, hair: (i * 3) % 8, hairColor: (i * 5) % 8, outfit: i % 6, outfitColor: (i * 3 + 1) % 8, extra: i % 3 },
   x: demoWorld.cx + Math.cos(i * 1.6) * 3, y: demoWorld.cy + Math.sin(i * 1.6) * 3, dir: 0, mv: true, hp: 1, maxHp: 1, dead: false, au: 0, bl: i === 1 ? 2 : 0,
 }));
 let demoT = 0;
@@ -165,7 +165,7 @@ function updateCreator() {
   for (const el of document.querySelectorAll('.swatch')) el.classList.toggle('on', draft.look[el.dataset.sw] === Number(el.dataset.i));
   $('lbl-hair').textContent = HAIR_STYLES[draft.look.hair];
   $('lbl-outfit').textContent = OUTFITS[draft.look.outfit];
-  $('lbl-beard').textContent = BEARDS[draft.look.beard | 0];
+  $('lbl-extra').textContent = EXTRAS[draft.look.extra | 0];
 }
 
 document.addEventListener('click', (e) => {
@@ -174,7 +174,7 @@ document.addEventListener('click', (e) => {
   const cyc = e.target.closest('[data-cyc]');
   if (cyc && draft) {
     const k = cyc.dataset.cyc;
-    const n = k === 'hair' ? HAIR_STYLES.length : k === 'beard' ? BEARDS.length : OUTFITS.length;
+    const n = k === 'hair' ? HAIR_STYLES.length : k === 'extra' ? EXTRAS.length : OUTFITS.length;
     draft.look[k] = (draft.look[k] + Number(cyc.dataset.d) + n) % n;
     updateCreator();
   }
@@ -183,7 +183,7 @@ $('rot-left').addEventListener('click', () => { previewDir = (previewDir + 3) % 
 $('rot-right').addEventListener('click', () => { previewDir = (previewDir + 1) % 4; });
 $('char-random').addEventListener('click', () => {
   const r = (n) => (Math.random() * n) | 0;
-  draft.look = { skin: r(SKINS.length), hair: r(HAIR_STYLES.length), hairColor: r(HAIR_COLORS.length), outfit: r(OUTFITS.length), outfitColor: r(OUTFIT_COLORS.length), beard: r(BEARDS.length) };
+  draft.look = { skin: r(SKINS.length), hair: r(HAIR_STYLES.length), hairColor: r(HAIR_COLORS.length), outfit: r(OUTFITS.length), outfitColor: r(OUTFIT_COLORS.length), extra: r(EXTRAS.length) };
   updateCreator();
 });
 $('char-done').addEventListener('click', () => {
