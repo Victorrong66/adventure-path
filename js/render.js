@@ -12,7 +12,7 @@ import { bladePositions, auraRadius, giantAngle, GIANT_LEN } from './sim.js';
 
 const BG = '#0c1a10';
 const DETAIL = 2;
-const ATTACK_POSE = 0.27; // seconds a sword swing lasts (wind-up, slash, follow-through)
+const ATTACK_POSE = 0.34; // seconds a sword swing lasts (wind-up, slash, follow-through)
 
 export class Renderer {
   constructor(canvas) {
@@ -289,8 +289,8 @@ export class Renderer {
     const cheer = this.fx.some((f) => f.t === 'lvl' && f.id === p.id);
     if (hit && since >= ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, 0, 'hurt');
     else if (cheer && !p.mv && since >= ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, 0, 'win'); // level up!
-    else if (since < ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, Math.min(2, Math.floor((since / (ATTACK_POSE * 1000)) * 3)), 'atk');
-    else if (p.mv || p.dash) s = charSprite(p.look, p.dir, Math.floor(now / 110) % 4);
+    else if (since < ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, since / (ATTACK_POSE * 1000), 'atk');
+    else if (p.mv || p.dash) s = charSprite(p.look, p.dir, Math.floor(now / 75));
     else {
       s = charSprite(p.look, p.dir, 0, 'idle');
       bob = Math.floor(now / 500 + (p.id.charCodeAt(1) || 0)) % 2; // breathing

@@ -1,7 +1,7 @@
 // All the 8-bit art is generated in code: characters are composed from parts,
 // monsters and props come from little pixel templates.
 
-import { heroFrame } from './hero.js';
+import { heroFrame, heroFrameCount } from './hero.js';
 export { loadHeroSheet } from './hero.js';
 
 export const SKINS = ['#ffdcb4', '#f0c08c', '#d8a070', '#b87848', '#8c5430', '#5c3418'];
@@ -85,11 +85,24 @@ function fromTemplate(rows, pal, margin = 1, doOutline = true) {
 
 const charCache = new Map();
 
+// Which way each sheet frame faces; anything else is mirrored to fit.
+const NATIVE = { front: 'down', back: 'up', side: 'right', sideL: 'left', atk: 'right', atkL: 'left', hurt: 'left', down: 'left', win: 'right' };
+
 // Heroes (see hero.js). Returns { img, ox, oy, w, h, hurt() }: draw img at
 // w x h at (footX - ox, footY - oy).
-// pose: 'walk' (frames 0..3), 'idle', 'atk' (0..2), 'hurt', 'down' or 'win'.
+// pose: 'walk' (frame = any running count), 'idle', 'atk' (frame = swing progress
+// 0..1), 'hurt', 'down' or 'win'.
 export function charSprite(look, facing, frame = 0, pose = 'walk') {
-  const key = `${look.skin}${look.hairColor}${look.outfit}${look.outfitColor}|${facing}|${pose}|${frame}`;
+  const left = facing === 3 || (facing === 1 && pose !== 'walk' && pose !== 'idle');
+  let kind;
+  if (pose === 'walk' || pose === 'idle') kind = facing === 0 ? 'front' : facing === 1 ? 'back' : left ? 'sideL' : 'side';
+  else if (pose === 'atk') kind = left ? 'atkL' : 'atk';
+  else kind = pose;
+  const n = heroFrameCount(kind);
+  const index = pose === 'idle' ? 0 : pose === 'atk' ? Math.min(n - 1, Math.floor(frame * n)) : ((frame % n) + n) % n;
+  const native = NATIVE[kind];
+  const flip = (native === 'left' || native === 'right') && native !== (left ? 'left' : 'right');
+  const key = `${look.skin}${look.hairColor}${look.outfit}${look.outfitColor}|${kind}|${index}|${flip ? 1 : 0}`;
   let s = charCache.get(key);
   if (!s) {
     const colors = {
@@ -98,13 +111,6 @@ export function charSprite(look, facing, frame = 0, pose = 'walk') {
       outfitColor: OUTFIT_COLORS[look.outfitColor] || OUTFIT_COLORS[0],
       outfit: OUTFITS[look.outfit] || OUTFITS[0],
     };
-    const left = facing === 3;
-    let kind = facing === 1 ? 'back' : facing === 0 ? 'front' : 'side';
-    let index = frame;
-    if (pose === 'idle') index = 0;
-    if (pose === 'atk' || pose === 'hurt' || pose === 'down' || pose === 'win') kind = pose;
-    // swings and falls face left or right; "up" swings go left, "down" swings go right
-    const flip = kind === 'atk' || kind === 'hurt' || kind === 'down' || kind === 'win' ? left || facing === 1 : left;
     const f = heroFrame(colors, kind, index, flip);
     let red = null;
     s = {

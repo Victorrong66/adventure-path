@@ -54,8 +54,11 @@ const TUNIC = {
 };
 
 // One frame, recoloured for `look` = { skin, hair, outfitColor (hex), outfit (name) }.
-// kind: 'front' | 'side' | 'back' (4 walking frames each), 'atk' (3), 'hurt', 'down', 'win'.
+// kind: 'front' | 'back' (5 frames), 'side' | 'sideL' (9-frame walks right / left),
+// 'atk' | 'atkL' (7-frame swings right / left), 'hurt', 'down', 'win'.
 // Returns { img, ox, oy } with the feet at (ox, oy).
+export const heroFrameCount = (kind) => HERO_FRAMES[kind].length;
+
 export function heroFrame(look, kind, index, flip) {
   const list = HERO_FRAMES[kind];
   const [sx, sy, w, h, footX] = list[index % list.length];
@@ -86,7 +89,6 @@ export function heroFrame(look, kind, index, flip) {
     }
   }
   g.putImageData(out, 0, 0);
-  // walking frames stand centred; the sword swing is anchored on the body
-  const fx = kind === 'atk' ? footX : Math.floor(w / 2);
-  return { img: c, ox: flip ? w - 1 - fx : fx, oy: h - 1 };
+  // frames are anchored on the head, so the hero doesn't wobble while walking
+  return { img: c, ox: flip ? w - 1 - footX : footX, oy: h - 1 };
 }
