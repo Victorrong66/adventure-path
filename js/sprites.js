@@ -1,7 +1,8 @@
 // All the 8-bit art is generated in code: characters are composed from parts,
 // monsters and props come from little pixel templates.
 
-import { buildHero, HERO_W, HERO_H, HERO_FOOT } from './hero.js';
+import { heroFrame } from './hero.js';
+export { loadHeroSheet } from './hero.js';
 
 export const SKINS = ['#ffdcb4', '#f0c08c', '#d8a070', '#b87848', '#8c5430', '#5c3418'];
 // Young adventurers off to fight monsters and dragons.
@@ -85,28 +86,31 @@ function fromTemplate(rows, pal, margin = 1, doOutline = true) {
 const charCache = new Map();
 
 // Heroes (see hero.js). Returns { img, ox, oy, w, h, hurt() }: draw img at
-// w x h (world pixels) at (footX - ox, footY - oy).
-// pose: 'walk' (frames 0..3), 'idle' (0..3) or 'atk' (0..2).
+// w x h at (footX - ox, footY - oy).
+// pose: 'walk' (frames 0..3), 'idle', 'atk' (0..2), 'hurt' or 'down'.
 export function charSprite(look, facing, frame = 0, pose = 'walk') {
-  const key = `${look.skin}${look.hair}${look.hairColor}${look.outfit}${look.outfitColor}${look.extra | 0}|${facing}|${pose}|${frame}`;
+  const key = `${look.skin}${look.hairColor}${look.outfit}${look.outfitColor}|${facing}|${pose}|${frame}`;
   let s = charCache.get(key);
   if (!s) {
-    const dir = facing === 3 ? 2 : facing;
     const colors = {
       skin: SKINS[look.skin] || SKINS[0],
       hair: HAIR_COLORS[look.hairColor] || HAIR_COLORS[0],
       outfitColor: OUTFIT_COLORS[look.outfitColor] || OUTFIT_COLORS[0],
-      style: HAIR_STYLES[look.hair] || HAIR_STYLES[0],
       outfit: OUTFITS[look.outfit] || OUTFITS[0],
-      extra: EXTRAS[look.extra | 0] || EXTRAS[0],
     };
-    let img = buildHero(colors, dir, pose, frame);
-    if (facing === 3) img = flipped(img);
+    const left = facing === 3;
+    let kind = facing === 1 ? 'back' : facing === 0 ? 'front' : 'side';
+    let index = frame;
+    if (pose === 'idle') index = 0;
+    if (pose === 'atk' || pose === 'hurt' || pose === 'down') kind = pose;
+    // swings and falls face left or right; "up" swings go left, "down" swings go right
+    const flip = kind === 'atk' || kind === 'hurt' || kind === 'down' ? left || facing === 1 : left;
+    const f = heroFrame(colors, kind, index, flip);
     let red = null;
     s = {
-      img, ox: HERO_W / 2, oy: HERO_FOOT - 1, w: HERO_W, h: HERO_H,
+      img: f.img, ox: f.ox, oy: f.oy, w: f.img.width, h: f.img.height,
       // red-tinted copy for the moment a hero gets hit
-      hurt() { return red || (red = tinted(img, 'rgba(255,40,40,0.65)')); },
+      hurt() { return red || (red = tinted(f.img, 'rgba(255,40,40,0.6)')); },
     };
     charCache.set(key, s);
   }

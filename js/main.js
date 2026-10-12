@@ -15,6 +15,10 @@ import {
   loadProfile, saveProfile, listWorlds, getWorld, storeWorld, deleteWorld, exportWorld, importWorld,
 } from './save.js';
 import { escapeHtml } from './util.js';
+import { loadHeroSheet } from './sprites.js';
+
+// The hero sprites must be loaded before anything is drawn.
+await loadHeroSheet();
 
 const $ = (id) => document.getElementById(id);
 
@@ -131,7 +135,8 @@ function demoFrame(dt) {
   // Title hero preview
   const tc = $('title-hero').getContext('2d');
   tc.clearRect(0, 0, 28, 34);
-  tc.drawImage(charSprite(profile.look, 0, Math.floor(demoT * 3.8) % 4, 'idle').img, 0, 0);
+  const ts = charSprite(profile.look, 0, 0, 'idle');
+  tc.drawImage(ts.img, 14 - ts.ox, 33 - ts.oy - (Math.floor(demoT * 2) % 2));
 }
 let lastT = performance.now();
 (function menuLoop(now) {
@@ -202,13 +207,13 @@ $('char-done').addEventListener('click', () => {
     g.imageSmoothingEnabled = false;
     g.clearRect(0, 0, c.width, c.height);
     g.fillStyle = 'rgba(0,0,0,0.25)';
-    g.fillRect(54, 180, 60, 9);
+    g.fillRect(90, 186, 60, 8);
     // Show off the poses: walk, breathe, swing
     const t = performance.now() % 3600;
     const s = t < 1800 ? charSprite(draft.look, DIRS[previewDir], Math.floor(t / 110) % 4)
       : t < 3000 ? charSprite(draft.look, DIRS[previewDir], Math.floor(t / 260) % 4, 'idle')
         : charSprite(draft.look, DIRS[previewDir], Math.min(2, Math.floor((t - 3000) / 200)), 'atk');
-    g.drawImage(s.img, 0, 0, s.img.width * 6, s.img.height * 6);
+    g.drawImage(s.img, 120 - s.ox * 5, 190 - s.oy * 5, s.img.width * 5, s.img.height * 5);
   }
   requestAnimationFrame(previewLoop);
 })();

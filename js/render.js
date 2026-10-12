@@ -270,26 +270,29 @@ export class Renderer {
     const g = this.g;
     const x = this.sx(p.x, p.y), y = this.sy(p.x, p.y);
     if (p.dead) {
-      const s = propSprite('tomb');
-      g.drawImage(s.img, x - s.ox, y - s.img.height + 2);
+      // knocked out on the ground, waiting for a friend to revive them
+      const ds = charSprite(p.look, p.dir, 0, 'down');
+      drawShadow(g, x, y, 14);
+      g.drawImage(ds.img, x - ds.ox, y - ds.oy, ds.w, ds.h);
       if (p.rv > 0) {
         g.fillStyle = '#202030'; g.fillRect(x - 8, y - 16, 16, 3);
         g.fillStyle = '#58d858'; g.fillRect(x - 7, y - 15, Math.round(14 * p.rv / 100), 1);
       }
-      // ghost of the player floating
-      g.globalAlpha = 0.35;
-      const gs = charSprite(p.look, 0, 0, 'idle');
-      g.drawImage(gs.img, x - gs.ox, y - gs.oy - 8 + Math.round(Math.sin(time * 3) * 2), gs.w, gs.h);
-      g.globalAlpha = 1;
       return;
     }
     const now = performance.now();
     // Pose: sword strike, walking, or breathing in place
     let s;
     const since = now - (this.attackAt.get(p.id) || -1e9);
-    if (since < ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, Math.min(2, Math.floor((since / (ATTACK_POSE * 1000)) * 3)), 'atk');
+    const hit = this.fx.some((f) => f.t === 'flash' && f.id === p.id);
+    let bob = 0;
+    if (hit && since >= ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, 0, 'hurt');
+    else if (since < ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, Math.min(2, Math.floor((since / (ATTACK_POSE * 1000)) * 3)), 'atk');
     else if (p.mv || p.dash) s = charSprite(p.look, p.dir, Math.floor(now / 110) % 4);
-    else s = charSprite(p.look, p.dir, Math.floor(now / 260 + (p.id.charCodeAt(1) || 0)) % 4, 'idle');
+    else {
+      s = charSprite(p.look, p.dir, 0, 'idle');
+      bob = Math.floor(now / 500 + (p.id.charCodeAt(1) || 0)) % 2; // breathing
+    }
 
     // Dash: a trail of fading afterimages
     let trail = this.trails.get(p.id);
@@ -303,9 +306,9 @@ export class Renderer {
     g.globalAlpha = 1;
 
     drawShadow(g, x, y, 9);
-    // Hit: flash red
-    const hurt = this.fx.some((f) => f.t === 'flash' && f.id === p.id) && Math.floor(now / 50) % 2 === 0;
-    g.drawImage(hurt ? s.hurt() : s.img, x - s.ox, y - s.oy, s.w, s.h);
+    // Hit: the hurt pose, flashing red
+    const flash = hit && Math.floor(now / 50) % 2 === 0;
+    g.drawImage(flash ? s.hurt() : s.img, x - s.ox, y - s.oy + bob, s.w, s.h);
   }
 
   drawNames(players, view) {
