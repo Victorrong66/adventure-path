@@ -245,6 +245,22 @@ export function buildHero(look, dir, pose, frame) {
       if (front) { R(6, 3, 3, 2, BRASS); P(7, 3, glass); R(11, 3, 3, 2, BRASS); P(12, 3, glass); }
     } else { R(7, 4, 7, 1, strap); R(11, 3, 3, 2, BRASS); P(12, 3, glass); }
   }
+  if (extra === 'Cap') {
+    // an adventurer's cap with the brim forward
+    const cap = '#e0b030', capD = dk(cap, 0.35), capL = lt(cap, 0.35);
+    if (!side) {
+      R(6, 0, 8, 1, cap); R(5, 1, 10, 3, cap); R(13, 1, 2, 3, capD); R(7, 1, 3, 1, capL); P(9, 0, capD);
+      if (front) { R(4, 4, 12, 1, capD); R(6, 2, 2, 1, '#fff8e8'); } else R(5, 4, 10, 1, capD);
+    } else { R(8, 0, 6, 1, cap); R(7, 1, 8, 3, cap); R(7, 1, 1, 3, capD); R(9, 1, 3, 1, capL); R(13, 4, 5, 1, capD); R(7, 4, 6, 1, cap); }
+  }
+  if (extra === 'Beanie') {
+    // a knit beanie with a fold and a pom-pom
+    const bn = '#eceaf0', bnD = '#b4b2c4', band = '#3a6ec0';
+    if (!side) {
+      R(9, -1, 2, 1, band); R(7, 0, 6, 1, bn); R(6, 1, 8, 2, bn); R(13, 1, 1, 2, bnD); for (let x = 7; x < 13; x += 2) P(x, 1, bnD);
+      R(5, 3, 10, 2, band); R(5, 4, 10, 1, dk(band, 0.3));
+    } else { R(9, -1, 2, 1, band); R(8, 0, 6, 1, bn); R(7, 1, 8, 2, bn); R(7, 3, 9, 2, band); R(7, 4, 9, 1, dk(band, 0.3)); }
+  }
   if (extra === 'Headband') {
     const band = '#d8402e', bandD = dk(band, 0.35);
     if (!side) { R(5, 5, 10, 1, band); if (front) { P(14, 5, bandD); P(15, 6, band); P(15, 7, bandD); } else { P(9, 6, band); P(10, 7, bandD); } }
@@ -307,57 +323,58 @@ export function buildHero(look, dir, pose, frame) {
   }
 }
 
-// Hair: adventurer haircuts drawn as small pixel templates for each view.
-// Template column i is frame x = 4 + i; the head is x6..13 (front/back) or
-// x8..13 (side, facing right), forehead row 5, eyes row 7.
-// H hair, D shade, L highlight, R red tie, T leather tie.
+// Hair: big, sculpted anime-style hero hair with its own dark outline, drawn as
+// pixel templates for each view. Template column i is frame x = 3 + i and row j
+// is frame y = j - 2. The head is x6..13 (front/back) or x8..13 (side, facing
+// right), forehead row 5, eyes row 7 - the templates keep the eyes clear.
+// O outline, H hair, D shade, L highlight.
 const HAIR = {
-  Tousled: {
-    front: ['....H..H....', '...HHHHHH...', '..HLLHHHHD..', '.HLHHHDHHHD.', '.HHHDHHHDHD.', '.HH.HHD.HHD.', '.D..H....D..'],
-    back: ['....H..H....', '...HHHHHH...', '..HLHHHHHD..', '.HHHHHDHHHD.', '.HHDHHHHHHD.', '.HHHHHDHHHD.', '.HDHHHHHDHD.', '.HHHHHHHHHD.', '..HDHHDHHD..', '..H.H..H.D..'],
-    side: ['.....H..H...', '....HHHHHH..', '...HLLHHHHD.', '..HHHHHDHHH.', '..HHDHHHHHD.', '..HHHHD.HHD.', '..HDHH...D..', '..HHD.......', '..DH........', '...D........'],
+  Hero: {
+    front: ['....O...O.....', '...OLO.OHO....', '..OLHOOHHO.O..', '.OLHHLHHHOOHO.', '.OHHLHHHHHHDO.', 'OHHLHHHHHHHHDO', 'OHLHHHHHHHHHDO', 'OHHHHHHHHHHDDO', '.OHDOHDOHHDDO.', '.OD.......DO..', '.O........O...'],
+    back: ['....O...O.....', '...OLO.OHO....', '..OLHOOHHO.O..', '.OLHHLHHHOOHO.', '.OHHLHHHHHHDO.', 'OHHLHHHHHHHHDO', 'OHLHHHHHHHHHDO', 'OHHHHHHHHHHHDO', 'OHHHLHHHHHHDDO', '.OHHHHHHHHHDO.', '.OHDHHHHHDHDO.', '.OHOHDOHDOHO..', '..O.O..O..O...'],
+    side: ['..O.O.........', '.OLOOLO.......', 'OLHHOLHOO.....', '.OHLHHLHHOO...', '..OHHLHHHHHO..', '.OHHHHHHHHHHO.', 'OHHHHHHHHHHHDO', '.OHHHHHHHHHHDO', 'OHHHHHDHHOHDO.', '.OHHHDO.......', 'OHHHDO........', '.OHDO.........', '..OO..........'],
   },
-  Swept: {
-    front: ['............', '...HHHHH....', '..HLLHHHH...', '.HLHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHDD.', '.D...HHHD.D.'],
-    back: ['............', '...HHHHH....', '..HLHHHHH...', '.HLHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '..HHHHHHHD..'],
-    side: ['............', '....HHHHH...', '...HLLHHHH..', '..HHHHHHHHH.', '..HHHHHHHHD.', '..HHHHHHHH..', '..HHHD..HD..', '..HHD.......', '..DHD.......', '...D........'],
+  Swoop: {
+    front: ['..............', '....OOOOO.....', '...OHHLLHOO...', '..OHHLLHHHHO..', '.OHHHHHHHHHHO.', '.OHHHHHHHHHHDO', '.OHHHHHHHHHHDO', '.OHDHHHHHHHHDO', '.OD.OHHHHHHHDO', '.O....OHHHHDO.', '.O......OHHDO.', '.........OHO..', '..........O...'],
+    back: ['..............', '....OOOOO.....', '...OHHLLHOO...', '..OHHLLHHHHO..', '.OHHHHHHHHHHO.', '.OHHHHHHHHHHDO', '.OHHHHHHHHHHDO', '.OHHHHHHHHHHDO', '.OHHHHHHHHHHDO', '.OHHHHHHHHHDO.', '.OHHDHHHHDHDO.', '..OHOHHOHDOO..', '...O.OO.O.....'],
+    side: ['..............', '....OOOOO.....', '...OHHLLHOO...', '..OHHLLHHHHO..', '.OHHHHHHHHHHO.', '.OHHHHHHHHHHHO', '.OHHHHHHHHHHHO', '.OHHHHHHHHHDO.', '.OHHHHD.OHHHO.', '.OHHHDO...OO..', 'OHHHDO........', '.OHDO.........', '..O...........'],
   },
-  Short: {
-    front: ['............', '...HHHHHH...', '..HHLLHHHH..', '.HHHDLLHHHD.', '.HHHHHHHHHD.', '.D.HHHHH..D.'],
-    back: ['............', '...HHHHHH...', '..HHLHHHHH..', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '..DHHHHHHD..'],
-    side: ['............', '....HHHHHH..', '...HHLLHHHH.', '..HHHHHHHHD.', '..HHHHHHHHD.', '..HHH..HHH..', '..HHD.......', '..HD........', '...D........'],
+  Flame: {
+    front: ['..............', '...O.OO.O.....', '..OLOLLOLO.O..', '.OLHLHHLHOOHO.', 'OOHHHHHHHHHHO.', 'OLHHHHHHHHHHHO', '.OHHLHHHHHHHDO', 'OHHHHHHHHHHHDO', '.OHOHHOHHOHDO.', '.O..O.....OO..'],
+    back: ['..............', '...O.OO.O.....', '..OLOLLOLO.O..', '.OLHLHHLHOOHO.', 'OOHHHHHHHHHHO.', 'OLHHHHHHHHHHHO', '.OHHLHHHHHHHDO', 'OHHHHHHHHHHHDO', '.OHHHHHHHHHDO.', 'OHHHHHHHHHHHDO', '.OHDHHDHHDHDO.', '..OO.OO.OO.O..'],
+    side: ['..............', '..OO..........', '.OLLOOO.......', 'OLHHLLHOOO....', '.OOHHHHLHHOO..', 'OLHHHHHHHHHHO.', '.OOHHHHHHHHHHO', 'OLHHHHHHHHHDO.', '.OHHHHHOHO....', 'OHHHHDO.......', '.OOHDO........', '..OO..........'],
   },
-  Shoulder: {
-    front: ['............', '...HHHHHH...', '..HHLHHHHH..', '.HHLHHHHHHD.', '.HHHHDHHHHD.', 'HHHHH.HHHHDD', 'HH........DD', 'HH........DD', 'HH........DD', 'HH........DD', 'HH........DD', 'HD........DD', 'HD........DD', 'D..........D'],
-    back: ['............', '...HHHHHH...', '..HHLHHHHH..', '.HHLHHHHHHD.', 'HHHHHHHHHHDD', 'HHHHHDHHHHDD', 'HHHHHHHHHHDD', 'HHDHHHHHDHDD', 'HHHHHHHHHHDD', 'HHHHHDHHHHDD', 'HHHHHHHHHHDD', 'HHDHHHHHDHDD', 'HHHHHHHHHHDD', '.H.H.H.H.H.D'],
-    side: ['............', '....HHHHHH..', '...HHLLHHHH.', '..HHHHHHHHD.', '..HHHHHHHHD.', '.HHHHHHHHH..', '.HHHHD...D..', '.HHHD.......', '.HHHD.......', '.HHHD.......', '.HHHD.......', '.HHHD.......', '.HHD........', '..D.........'],
+  Layered: {
+    front: ['..............', '....OOOOO.....', '..OOHHLLHOO...', '.OHHLLHHHHHO..', '.OHLHHHHDHHHO.', 'OHHHHHDHHHHHDO', 'OHHDHHHHHDHHDO', 'OHHHHHHHHHHHDO', '.OHDOHHOHDHDO.', '.ODO......ODO.', '.OO........O..'],
+    back: ['..............', '....OOOOO.....', '..OOHHLLHOO...', '.OHHLLHHHHHO..', '.OHLHHHHDHHHO.', 'OHHHHHDHHHHHDO', 'OHHDHHHHHDHHDO', 'OHHHHHHHHHHHDO', 'OHHDHHHDHHHHDO', '.OHHHHDHHHDHO.', '.OHDHHHHDHHDO.', '..OHOHDOHOHO..', '..O..O..O..O..'],
+    side: ['..............', '....OOOOO.....', '..OOHHLLHOO...', '.OHHLLHHHHHO..', '.OHLHHHHDHHHO.', 'OHHHHHDHHHHHHO', 'OHHDHHHHHDHHDO', 'OHHHHHHHHHHDO.', 'OHHHDHHOHHDO..', '.OHHHDO..OO...', 'OHHDHO........', '.OHDO.........', '..OO..........'],
   },
-  Braid: {
-    front: ['............', '...HHHHHH...', '..HHHLLHHH..', '.HHLHDHHHHD.', '.HHHHDHHHHD.', '.HH.....HHD.', '.D.......HHD', '..........HD', '..........DH', '..........HD', '..........DH', '..........HD', '..........DH', '..........RR', '..........HH'],
-    back: ['............', '...HHHHHH...', '..HHLHHHHH..', '.HHLHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '..HHHHHHHD..', '.....HD.....', '.....DH.....', '.....HD.....', '.....DH.....', '.....HD.....', '.....DH.....', '.....RR.....', '.....HH.....'],
-    side: ['............', '....HHHHHH..', '...HHLLHHHH.', '..HHHHHHHHD.', '..HHHHHHHHD.', '..HHHH..HH..', '..HHD.......', '.HDD........', '.DH.........', '.HD.........', '.DH.........', '.HD.........', '.DH.........', '.RR.........', '.HH.........'],
+  Wild: {
+    front: ['...O....O.....', '..OLO.O.OHO...', '..OHLOHOHHO.O.', '.OOHLHHHHHHOHO', 'OLHHHHHHHHHHO.', '.OHHLHHHHHHHDO', 'OHHHHHHHHHHHDO', '.OHHHHHHHHHHO.', 'OHDOHHOHHOHDDO', '.O.O......O.O.'],
+    back: ['...O....O.....', '..OLO.O.OHO...', '..OHLOHOHHO.O.', '.OOHLHHHHHHOHO', 'OLHHHHHHHHHHO.', '.OHHLHHHHHHHDO', 'OHHHHHHHHHHHDO', '.OHHHHHHHHHHDO', 'OHHHHHHHHHHHDO', '.OHHHHHHHHHDO.', 'OHHDHHHHDHHDDO', '.OO.OHO.OHO.O.', '......O...O...'],
+    side: ['..O.....O.....', '.OLO.O.OHO....', 'OHLOOHOHHO.O..', '.OOHLHHHHHOOHO', 'OLHHHHHHHHHHO.', '.OHHLHHHHHHHHO', 'OHHHHHHHHHHHO.', '.OHHHHHHHHHHDO', 'OHHHHHOHHOHO..', '.OHHHDO.......', 'OHHHO.........', '.OHO..........', '..O...........'],
   },
-  'Tied Back': {
-    front: ['............', '...HHHHHH...', '..HLLHHHHH..', '.HLHHHHHHHD.', '.HHHHHHHHHD.', '.HD......DD.', '.D........D.'],
-    back: ['............', '...HHHHHH...', '..HLLHHHHH..', '.HLHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '..HHHHHHHD..', '....HHHD....', '.....TT.....', '.....HD.....', '.....HD.....', '.....HD.....', '.....DD.....'],
-    side: ['............', '....HHHHHH..', '...HLLHHHHH.', '..HHHHHHHHD.', '..HHHHHHHHD.', '..HHHHD.HD..', '..HHHD......', '.TTHD.......', 'HHD.........', 'HD..........', 'HD..........', 'HD..........', 'D...........'],
+  Fluffy: {
+    front: ['..............', '....OOOOO.....', '...OHLLLHOO...', '..OHLLHHHHHO..', '.OHHHHHHHHHHO.', '.OHHHHHHHHHHHO', 'OHHHHHHHHHHHHO', 'OHHHHHHDHHHHDO', '.OHOHHOHHOHDO.', '.O........OO..'],
+    back: ['..............', '....OOOOO.....', '...OHLLLHOO...', '..OHLLHHHHHO..', '.OHHHHHHHHHHO.', '.OHHHHHHHHHHHO', 'OHHHHHHHHHHHDO', 'OHHHHHHHHHHHDO', 'OHHHHHHHHHHHDO', '.OHHHHHHHHHDO.', '.OHOHHOHHOHDO.', '..O..O..O..O..'],
+    side: ['..............', '....OOOOO.....', '...OHLLLHOO...', '..OHLLHHHHHO..', '.OHHHHHHHHHHO.', '.OHHHHHHHHHHHO', 'OHHHHHHHHHHHHO', 'OHHHHHHHHHHDO.', 'OHHHHHHOHHO...', '.OHHHHO.......', '.OHOHO........', '..O.O.........'],
   },
-  Coils: {
-    front: ['...HHHHHH...', '..HLHDHLHH..', '.HLHDHHHDHH.', '.HDHHHLHHDH.', '.HHHDHHDHHD.', '.HDH.DH.HDD.'],
-    back: ['...HHHHHH...', '..HLHDHLHH..', '.HLHDHHHDHH.', '.HDHHHLHHDH.', '.HHHDHHDHHD.', '.HDHHHDHHDH.', '.HHDHHHHDHD.', '.HDHHDHHHDH.', '..HHDHHDHD..'],
-    side: ['....HHHHHH..', '...HLHDHLHH.', '..HLHDHHHDH.', '..HDHHHLHHD.', '..HHHDHHDHD.', '..HDHHD.HD..', '..HHDH......', '..DHD.......', '...D........'],
+  Long: {
+    front: ['..............', '....OOOOO.....', '..OOHHLLHOO...', '.OHHLLHHHHHO..', '.OHLHHHHDHHHO.', 'OHHHHHDHHHHHDO', 'OHHDHHHHHDHHDO', 'OHHHHHHHHHHHDO', 'OHHDOHHOHDHHDO', 'OHO.......OHDO', 'OHO.......OHDO', 'OHO.......OHDO', 'OHDO.....OHDDO', 'OHDO.....OHDO.', 'OHHO.....OHDO.', 'ODHO.....OHDO.', '.OO.......OO..'],
+    back: ['..............', '....OOOOO.....', '..OOHHLLHOO...', '.OHHLLHHHHHO..', '.OHLHHHHDHHHO.', 'OHHHHHDHHHHHDO', 'OHHDHHHHHDHHDO', 'OHHHHHHHHHHHDO', 'OHHHHHHHDHHHDO', 'OHHDHHHHHHHHDO', 'OHHHHHDHHHHHDO', 'OHHHHHHHHDHHDO', 'OHDHHHHHHHHHDO', 'OHHHHDHHHHHHDO', 'OHHHHHHHDHHDDO', '.OHDOHHOHDOHO.', '..O..OO..O.O..'],
+    side: ['..............', '....OOOOO.....', '..OOHHLLHOO...', '.OHHLLHHHHHO..', '.OHLHHHHDHHHO.', 'OHHHHHDHHHHHHO', 'OHHDHHHHHDHHDO', 'OHHHHHHHHHHDO.', 'OHHHDHHOHHDO..', 'OHHHHDO..OO...', 'OHHDHO........', 'OHHHHO........', 'OHHDHO........', 'OHHHDO........', 'OHDHO.........', '.OHDO.........', '..OO..........'],
   },
-  Crew: {
-    front: ['............', '............', '...HHHHHH...', '..HHLHHHHD..', '..HDHHDHHD..', '..D......D..'],
-    back: ['............', '............', '...HHHHHH...', '..HHLHHHHD..', '..HDHHDHHD..', '..HHHHHHHD..', '..HDHHDHHD..', '..HHHHHHHD..', '...DHHHHD...'],
-    side: ['............', '............', '....HHHHH...', '...HHLHHHD..', '...HDHHDHD..', '...HHHD.....', '...HDH......', '...DD.......'],
+  Slick: {
+    front: ['..............', '....OOOOO.....', '...OLLLHHO....', '..OLHHLHHHO...', '.OHHHLHHHHHO..', '.OHHHHLHHHHDO.', 'OHHHHHHHHHHHDO', '.OHHHHHHHHHDO.', '.OHO......OO..', '..O...........'],
+    back: ['..............', '....OOOOO.....', '...OLLLHHO....', '..OLHHLHHHO...', '.OHHHLHHHHHO..', '.OHHHHLHHHHDO.', 'OHHHHHHHHHHHDO', 'OHHHHHHHHHHHDO', 'OHHHHHHHHHHHDO', '.OHHHHHHHHHDO.', '.OHHDHHHDHHDO.', '..OHHOHHOHHO..', '...O..O..O....'],
+    side: ['..............', '....OOOOO.....', '...OLLLHHO....', '..OLHHLHHHO...', '.OHHHLHHHHHO..', 'OHHHHHLHHHHHO.', 'OHHHHHHHHHHHO.', '.OHHHHHHHHO...', 'OHHHHHO.......', 'OHHHHO........', '.OHHDO........', '..OO..........'],
   },
 };
 
 function drawHair(style, view, R, P, H, D, Lt) {
-  const t = (HAIR[style] || HAIR.Tousled)[view];
-  const col = { H, D, L: Lt, R: '#c0402e', T: '#4e3420' };
+  const t = (HAIR[style] || HAIR.Hero)[view];
+  const col = { H, D, L: Lt, O: dk(H, 0.68) };
   t.forEach((row, j) => {
-    for (let i = 0; i < row.length; i++) if (col[row[i]]) P(4 + i, j, col[row[i]]);
+    for (let i = 0; i < row.length; i++) if (col[row[i]]) P(3 + i, j - 2, col[row[i]]);
   });
 }

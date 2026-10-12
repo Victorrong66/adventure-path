@@ -207,5 +207,5 @@ function validFace(f) {
 function sanitizeLook(l) {
   const n = (v, max) => Math.max(0, Math.min(max, Number(v) | 0));
   l = l || {};
-  return { skin: n(l.skin, 5), hair: n(l.hair, 7), hairColor: n(l.hairColor, 7), outfit: n(l.outfit, 5), outfitColor: n(l.outfitColor, 7), extra: n(l.extra, 2) };
+  return { skin: n(l.skin, 5), hair: n(l.hair, 7), hairColor: n(l.hairColor, 7), outfit: n(l.outfit, 5), outfitColor: n(l.outfitColor, 7), extra: n(l.extra, 4) };
 }
