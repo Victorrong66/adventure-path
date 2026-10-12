@@ -130,7 +130,7 @@ function demoFrame(dt) {
   renderer.draw({ world: demoWorld, players: demoHeroes, enemies: [], projs: [], pickups: [], me: null, meId: null, time: demoT, phase: 'demo' }, dt);
   // Title hero preview
   const tc = $('title-hero').getContext('2d');
-  tc.clearRect(0, 0, 56, 62);
+  tc.clearRect(0, 0, 28, 34);
   tc.drawImage(charSprite(profile.look, 0, Math.floor(demoT * 3.8) % 4, 'idle').img, 0, 0);
 }
 let lastT = performance.now();
@@ -202,13 +202,13 @@ $('char-done').addEventListener('click', () => {
     g.imageSmoothingEnabled = false;
     g.clearRect(0, 0, c.width, c.height);
     g.fillStyle = 'rgba(0,0,0,0.25)';
-    g.fillRect(34, 114, 44, 4);
+    g.fillRect(54, 180, 60, 9);
     // Show off the poses: walk, breathe, swing
     const t = performance.now() % 3600;
     const s = t < 1800 ? charSprite(draft.look, DIRS[previewDir], Math.floor(t / 110) % 4)
       : t < 3000 ? charSprite(draft.look, DIRS[previewDir], Math.floor(t / 260) % 4, 'idle')
         : charSprite(draft.look, DIRS[previewDir], Math.min(2, Math.floor((t - 3000) / 200)), 'atk');
-    g.drawImage(s.img, 0, 0, s.img.width * 2, s.img.height * 2);
+    g.drawImage(s.img, 0, 0, s.img.width * 6, s.img.height * 6);
   }
   requestAnimationFrame(previewLoop);
 })();

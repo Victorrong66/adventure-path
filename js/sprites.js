@@ -1,7 +1,7 @@
 // All the 8-bit art is generated in code: characters are composed from parts,
 // monsters and props come from little pixel templates.
 
-import { buildHero, HERO_W, HERO_H } from './hero.js';
+import { buildHero, HERO_W, HERO_H, HERO_FOOT } from './hero.js';
 
 export const SKINS = ['#ffdcb4', '#f0c08c', '#d8a070', '#b87848', '#8c5430', '#5c3418'];
 // Young adventurers off to fight monsters and dragons.
@@ -84,9 +84,9 @@ function fromTemplate(rows, pal, margin = 1, doOutline = true) {
 
 const charCache = new Map();
 
-// Heroes are drawn at twice the world resolution (see hero.js). Returns
-// { img, ox, oy, w, h, hurt() }: draw img scaled to w x h (world pixels) at
-// (footX - ox, footY - oy). pose: 'walk' (frames 0..3), 'idle' (0..1) or 'atk'.
+// Heroes (see hero.js). Returns { img, ox, oy, w, h, hurt() }: draw img at
+// w x h (world pixels) at (footX - ox, footY - oy).
+// pose: 'walk' (frames 0..3), 'idle' (0..3) or 'atk' (0..2).
 export function charSprite(look, facing, frame = 0, pose = 'walk') {
   const key = `${look.skin}${look.hair}${look.hairColor}${look.outfit}${look.outfitColor}${look.extra | 0}|${facing}|${pose}|${frame}`;
   let s = charCache.get(key);
@@ -104,7 +104,7 @@ export function charSprite(look, facing, frame = 0, pose = 'walk') {
     if (facing === 3) img = flipped(img);
     let red = null;
     s = {
-      img, ox: HERO_W / 4, oy: (HERO_H - 3) / 2, w: HERO_W / 2, h: HERO_H / 2,
+      img, ox: HERO_W / 2, oy: HERO_FOOT - 1, w: HERO_W, h: HERO_H,
       // red-tinted copy for the moment a hero gets hit
       hurt() { return red || (red = tinted(img, 'rgba(255,40,40,0.65)')); },
     };
