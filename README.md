@@ -8,9 +8,10 @@ waves of monsters together.
 
 - **Character creator:** 6 skin tones, 8 hair styles, 8 hair colors, 6 outfits (Tunic, Knight,
   Wizard, Ninja, Hoodie, Overalls) and 8 outfit colors.
-- **Co-op multiplayer (up to 8 players):** one person hosts in their browser and friends join
-  with a 5-letter room code or an invite link. It's peer-to-peer over WebRTC (PeerJS), so you
-  don't need to run a game server.
+- **Co-op multiplayer (up to 8 players):** one person hosts a world and friends join with a
+  5-letter room code or an invite link. The game itself runs on a small server on Cloudflare
+  (free plan), so nobody connects to anybody else's device. Each world keeps its room code, so
+  friends can rejoin with the same code next time.
 - **Saves:** the host's worlds are saved in their browser and autosaved. Each friend's level,
   upgrades and gold are saved inside the host's world too. You can export a save to a file and
   import it on another computer, so someone else can take over hosting.
@@ -47,33 +48,30 @@ On phones and tablets, drag anywhere on the left side of the screen to move (a j
 
 ## Playing
 
-The game is a static website with no build step.
+The game is plain HTML, CSS and JavaScript (no build step) plus a small game server
+(`server/worker.js`) that runs on Cloudflare Workers with Durable Objects. One Cloudflare Worker
+serves both the website and the game server.
 
-- **Online:** after this is merged to `main`, turn on GitHub Pages (Settings -> Pages ->
-  Source: **GitHub Actions**). The workflow in `.github/workflows/pages.yml` publishes the game at
-  `https://victorrong66.github.io/storm-stand/`.
-- **Locally:** serve the folder with any static web server (ES modules don't load from `file://`):
-
-  ```sh
-  python3 -m http.server 8080
-  # then open http://localhost:8080
-  ```
+- **Online:** every push to `main` deploys to Cloudflare through `.github/workflows/deploy.yml`.
+  It needs two repository secrets (Settings → Secrets and variables → Actions):
+  `CLOUDFLARE_API_TOKEN` (made from the "Edit Cloudflare Workers" template) and
+  `CLOUDFLARE_ACCOUNT_ID`. The game is then at `https://victors-world.<your-subdomain>.workers.dev`.
+- **Locally:** `npm install`, then `npm run dev` and open http://localhost:8787.
 
 ### Multiplayer notes
 
-- Matchmaking uses the free public PeerJS server. After two players find each other, game data
-  goes directly between their browsers.
-- The host's tab has to stay open and in front. The game asks the phone not to sleep while playing,
-  but if the host switches apps or locks the phone, the world pauses and friends drop. When a
-  friend's connection drops, their game reconnects by itself for about a minute, and their
-  progress is kept.
-- Some networks (mobile data, some school or office Wi-Fi) block direct peer-to-peer
-  connections. The game then falls back to a **relay** (TURN server). It has two built in: an
-  [ExpressTURN](https://www.expressturn.com/) free-tier relay and PeerJS's free relay. You can add
-  another one in **Settings → Multiplayer Relay** (address, username and password). The host's invite link (pause menu →
-  Copy Invite Link) carries the relay, so friends who join through it are set up automatically.
-- You can use your own PeerJS server instead of the public one by adding URL parameters:
-  `?peerhost=my.server.com&peerport=443&peersecure=1`.
+- Each room code gets its own Durable Object on Cloudflare. It runs the game rules (`js/sim.js`)
+  and sends everyone 20 updates a second over a WebSocket.
+- The host's browser keeps the save. The server sends the host the latest copy every 30 seconds
+  and after waves, and the host can **Save World** or **Export Save File** from the pause menu.
+- If anyone drops (the host too), the world keeps going for everyone else and their game
+  reconnects by itself for about a minute. An empty world waits 60 seconds, then closes.
+- Each world keeps its room code. Anyone who has the code can join while the world is open, so
+  use **New Code** in the world list to stop old codes working.
+- Cloudflare's free plan gives Durable Objects a daily allowance (100,000 requests, reset at
+  midnight UTC), and messages from players count toward it (see Cloudflare's Durable Objects
+  pricing page for exactly how). To stay well inside it, the game only sends your position when
+  you move, 15 times a second at most, plus a small keep-alive every couple of seconds.
 
 ## Moving to a new repo
 
@@ -97,6 +95,6 @@ game.
 | `js/scenery.js` | Ground painting (grass, paths, ponds) and scenery art (trees, cottage, stall...) |
 | `js/sprites.js` | All pixel art (characters, monsters, props, tiles) and the pixel font |
 | `js/audio.js` | Chiptune sound effects and music |
-| `js/net.js` | PeerJS host/join helpers |
+| `js/net.js` | Connecting to a room on the game server |
+| `server/worker.js` | Cloudflare Worker + Durable Object game server (one per room code) |
 | `js/save.js` | Saves, profiles, import/export |
-| `js/vendor/peerjs.min.js` | PeerJS 1.5.5 (MIT license) |

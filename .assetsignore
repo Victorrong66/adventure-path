@@ -1,0 +1,13 @@
+# Files that are not part of the website
+.git
+.github
+.wrangler
+node_modules
+server
+docs
+wrangler.jsonc
+package.json
+package-lock.json
+.assetsignore
+.gitignore
+*.md

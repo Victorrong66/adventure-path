@@ -2,6 +2,10 @@
 
 Paste everything below the line into a new Claude Code chat.
 
+Note: this describes the original peer-to-peer (PeerJS) version. The game now runs its
+multiplayer on a Cloudflare Worker + Durable Object game server instead (see `server/worker.js`
+and the README); use that design for the Multiplayer section if you rebuild it.
+
 ---
 
 Build a browser game called **Victor's World**: a pixel-art, co-op monster-swarm game (like Vampire Survivors / a "swarm arena") with a top-down three-quarter camera like Stardew Valley. Friends play together in their browsers on computers and phones. It must be a static website (plain HTML, CSS and JavaScript ES modules, no build step) that can be hosted on GitHub Pages.

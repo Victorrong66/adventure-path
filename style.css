@@ -195,8 +195,6 @@ body.touch .weapons { display: none; }
 
 .face-row { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
 .setting { background: var(--panel-2); box-shadow: 0 0 0 3px var(--edge); padding: 12px; margin: 12px 0; }
-.relay-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-.relay-row .field { flex: 1 1 140px; }
 textarea {
   font: inherit; font-size: 9px; color: var(--ink); background: #0c0a18; border: 0; padding: 8px; margin: 3px;
   box-shadow: 0 0 0 3px var(--edge), inset 3px 3px 0 rgba(0,0,0,.5); resize: vertical; -webkit-user-select: text; user-select: text;

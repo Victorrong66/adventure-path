@@ -1,0 +1,16 @@
+// Cloudflare Workers config: serves the game files and runs the game server.
+// Deploy with `npx wrangler deploy` (the GitHub Action does this on every push to main).
+{
+  "name": "victors-world",
+  "main": "server/worker.js",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS"
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "ROOMS", "class_name": "Room" }]
+  },
+  // The free plan needs SQLite-backed Durable Objects.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }]
+}

@@ -1,5 +1,6 @@
 // Saves live in the host's browser (localStorage). Worlds can also be exported
 // to a file and imported on another computer, so anyone can take over hosting.
+// (The game server only holds a world while it's open, and sends the host updates.)
 import { uid } from './util.js';
 import { DEFAULT_LOOK } from './sprites.js';
 
@@ -34,40 +35,6 @@ export function loadMobFace() {
 }
 export function saveMobFace(face) {
   try { localStorage.setItem(FACE_KEY, face || 'none'); } catch { /* ignore */ }
-}
-
-// Optional TURN relay for players on strict networks: { urls: [..], username, credential }.
-const RELAY_KEY = 'vw.relay';
-export function loadRelay() {
-  const r = read(RELAY_KEY, null);
-  return r && Array.isArray(r.urls) && r.urls.length ? r : null;
-}
-export function saveRelay(r) {
-  try {
-    if (r) localStorage.setItem(RELAY_KEY, JSON.stringify(r));
-    else localStorage.removeItem(RELAY_KEY);
-  } catch { /* ignore */ }
-}
-
-// Turn what someone typed into a relay config. Accepts several URLs separated by
-// spaces, commas or new lines, with or without the turn: prefix.
-export function parseRelay(urlText, username, credential) {
-  const urls = String(urlText || '').split(/[\s,]+/).map((u) => u.trim()).filter(Boolean)
-    .map((u) => u.replace(/^https?:\/\//i, '').replace(/\/+$/, ''))
-    .map((u) => (/^(turns?|stun):/i.test(u) ? u : 'turn:' + u));
-  if (!urls.length) return null;
-  return { urls, username: String(username || '').trim(), credential: String(credential || '').trim() };
-}
-
-// Relay settings travel inside invite links so friends don't have to type them.
-export function encodeRelay(r) {
-  return btoa(unescape(encodeURIComponent(JSON.stringify(r)))).replace(/=+$/, '');
-}
-export function decodeRelay(s) {
-  try {
-    const r = JSON.parse(decodeURIComponent(escape(atob(s))));
-    return r && Array.isArray(r.urls) ? parseRelay(r.urls.join(' '), r.username, r.credential) : null;
-  } catch { return null; }
 }
 
 export function listWorlds() {

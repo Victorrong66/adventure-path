@@ -1,29 +1,28 @@
-// A running game session. The host runs the Sim and streams snapshots to friends;
-// a client predicts its own movement and draws everything else from snapshots.
-import { Sim, WEAPONS, PASSIVES, SHOP, slashCooldown, ENEMY_TYPES, PROJ_KINDS, PICKUP_KINDS } from './sim.js';
+// A running game session. The game server runs the Sim and streams snapshots to
+// everyone (the host included); each player predicts their own movement and draws
+// everything else from snapshots. The host's browser keeps the world save.
+import { WEAPONS, PASSIVES, SHOP, slashCooldown, ENEMY_TYPES, PROJ_KINDS, PICKUP_KINDS } from './sim.js';
 import { World } from './world.js';
 import { screenToWorldDir, facingFromScreen, escapeHtml } from './util.js';
-import { storeWorld, loadMobFace, saveMobFace, loadRelay, encodeRelay } from './save.js';
+import { storeWorld, loadMobFace, saveMobFace } from './save.js';
 import { setMobFace, processFacePhoto } from './sprites.js';
+import { JOIN_ERRORS } from './net.js';
 
 const $ = (id) => document.getElementById(id);
-const STEP = 1 / 60;
-const NET_RATE = 1 / 15;
-const MAX_PLAYERS = 8;
+const INPUT_RATE = 1 / 15;
+const IDLE_RATE = 2;
 
 export class Game {
-  constructor({ mode, profile, renderer, audio, input, onExit }) {
-    this.mode = mode;
+  constructor({ profile, renderer, audio, input, onExit }) {
     this.profile = profile;
     this.renderer = renderer;
     this.audio = audio;
     this.input = input;
     this.onExit = onExit;
     this.running = false;
-    this.acc = 0;
     this.netT = 0;
-    this.saveT = 0;
-    this.netEvents = [];
+    this.idleT = 0;
+    this.lastInput = '';
     this.dashT = 0;
     this.dashCd = 0;
     this.lastMove = [0, 1];
@@ -34,163 +33,106 @@ export class Game {
     this.announceTimer = null;
   }
 
-  // ---------------------------------------------------------------- host
+  // ---------------------------------------------------------------- connecting
 
-  async startHost(save, peerSetup) {
-    this.save = save;
-    this.sim = new Sim(save);
-    this.world = this.sim.world;
-    this.sim.onSave = () => this.persist();
-    this.myId = 'h';
-    this.sim.addPlayer('h', this.profile);
-    // The face from Settings wins; older saves may carry one from the in-game menu.
-    const setting = loadMobFace();
-    this.face = setting === undefined ? save.mobFace || null : setting;
-    await setMobFace(this.face).catch(() => { this.face = null; return setMobFace(null); });
-    this.sim.events = [];
-    this.conns = new Map();
-    this.lastSeen = new Map();
-    this.nextPid = 1;
-    const { peer, code } = await peerSetup((conn) => this.onConnection(conn));
-    this.peer = peer;
-    this.code = code;
-    this.begin();
-    this.chatLine(null, `World "${save.name}" is open! Room code: ${code}`);
-  }
-
-  onConnection(conn) {
-    const id = 'p' + this.nextPid++;
-    this.lastSeen.set(id, performance.now());
-    conn.on('data', (d) => { this.lastSeen.set(id, performance.now()); this.onClientData(id, conn, d); });
-    conn.on('close', () => this.dropClient(id));
-    conn.on('error', () => this.dropClient(id));
-    conn.on('iceStateChanged', (s) => { if (s === 'failed' || s === 'closed') this.dropClient(id); });
-  }
-
-  onClientData(id, conn, d) {
-    if (!d || typeof d !== 'object') return;
-    if (d.t === 'hello') {
-      if (this.conns.has(id)) return;
-      if (this.sim.players.size >= MAX_PLAYERS) { conn.send({ t: 'full' }); setTimeout(() => conn.close(), 500); return; }
-      // Same player coming back (e.g. their connection dropped): the new
-      // connection replaces the old one, which may not have noticed it's dead yet.
-      const old = [...this.sim.players.values()].find((p) => p.pid === d.pid && p.id !== 'h');
-      if (old) this.dropClient(old.id);
-      if (d.pid === this.profile.pid) { conn.send({ t: 'dupe' }); setTimeout(() => conn.close(), 500); return; }
-      this.conns.set(id, conn);
-      this.sim.addPlayer(id, { pid: String(d.pid).slice(0, 20), name: d.name, look: sanitizeLook(d.look) });
-      const p = this.sim.players.get(id);
-      conn.send({ t: 'welcome', id, seed: this.save.seed, name: this.save.name, code: this.code, x: p.x, y: p.y, tpn: p.tpn, face: this.face || null });
-      this.sendRoster();
-      this.persist();
-      return;
-    }
-    if (!this.conns.has(id)) return;
-    if (d.t === 'in') this.sim.setInput(id, d);
-    else if (d.t === 'act') this.sim.action(id, d.a, d.v);
-    else if (d.t === 'chat') {
-      const p = this.sim.players.get(id);
-      if (p) this.broadcastChat(p.name, String(d.m || '').slice(0, 120));
-    }
-  }
-
-  dropClient(id) {
-    this.lastSeen.delete(id);
-    if (!this.conns.has(id)) return;
-    const conn = this.conns.get(id);
-    this.conns.delete(id);
-    try { conn.close(); } catch { /* ignore */ }
-    this.sim.removePlayer(id);
-    this.sendRoster();
-    this.persist();
-  }
-
-  sendRoster() {
-    const list = [...this.sim.players.values()].map((p) => [p.id, p.name, p.look]);
-    for (const c of this.conns.values()) c.send({ t: 'roster', list });
-  }
-
-  broadcastChat(from, m) {
-    if (!m.trim()) return;
-    for (const c of this.conns.values()) c.send({ t: 'chat', from, m });
-    this.chatLine(from, m);
-  }
-
-  // Host only: change the photo-face the monsters wear, and tell everyone.
-  async setFace(face) {
-    this.face = face || null;
-    this.save.mobFace = this.face;
-    saveMobFace(this.face);
-    await setMobFace(this.face);
-    for (const c of this.conns.values()) c.send({ t: 'face', face });
-    this.updateFacePreview();
-    this.persist();
-  }
-
-  updateFacePreview() {
-    const img = $('face-preview');
-    if (this.mode === 'host' && this.face) { img.src = this.face; img.classList.remove('hidden'); }
-    else img.classList.add('hidden');
-    $('menu-face-clear').classList.toggle('hidden', !(this.mode === 'host' && this.face));
-  }
-
-  persist() {
-    if (this.mode !== 'host') return;
-    storeWorld(this.sim.snapshotSave());
-  }
-
-  // ---------------------------------------------------------------- client
-
-  async startClient(peer, conn) {
-    this.peer = peer;
+  // Join the room on `conn`. Pass the world save to open (or re-open) it as the host.
+  async start(conn, hostSave = null) {
     this.conn = conn;
     this.roster = new Map();
     this.cl = { players: new Map(), enemies: new Map(), projs: new Map(), pickups: new Map() };
     this.state = { ph: 'camp', w: 1, cp: 1, pt: 0, left: 0, k: 0 };
     this.serverT = 0;
     this.priv = null;
+    this.save = hostSave;
+    // The face from Settings wins; older saves may carry one from the in-game menu.
+    const setting = loadMobFace();
+    const face = setting === undefined ? (hostSave && hostSave.mobFace) || null : setting;
     await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('The host did not answer.')), 10000);
+      const timer = setTimeout(() => reject(new Error('The game server did not answer.')), 10000);
       conn.on('data', (d) => {
         if (d.t === 'welcome') {
           clearTimeout(timer);
           this.myId = d.id;
+          this.isHost = !!d.host;
           this.code = d.code;
           this.worldName = d.name;
-          setMobFace(d.face || null).catch(() => setMobFace(null));
+          this.face = d.face || null;
+          setMobFace(this.face).catch(() => setMobFace(null));
           this.world = new World(d.seed);
           this.self = { id: d.id, x: d.x, y: d.y, dir: 0, mv: false, dash: false, tpn: d.tpn };
           resolve();
-        } else if (d.t === 'full') { clearTimeout(timer); reject(new Error('That world is full (8 players max).')); }
-        else if (d.t === 'dupe') { clearTimeout(timer); reject(new Error('You are already in that world in another tab.')); }
-        else this.onHostData(d);
+        } else if (d.t === 'err') {
+          clearTimeout(timer);
+          const err = new Error(JOIN_ERRORS[d.err] || JOIN_ERRORS.bad);
+          err.code = d.err;
+          if (this.running && d.err === 'dupe') { this.stop(); this.onExit(err.message); }
+          reject(err);
+        } else this.onServerData(d);
       });
       conn.on('close', () => { clearTimeout(timer); reject(new Error('Connection closed.')); this.disconnected(); });
-      conn.on('iceStateChanged', (s) => { if (s === 'failed' || s === 'closed') this.disconnected(); });
-      conn.send({ t: 'hello', pid: this.profile.pid, name: this.profile.name, look: this.profile.look });
+      conn.send({
+        t: 'hello', pid: this.profile.pid, name: this.profile.name, look: this.profile.look,
+        host: hostSave ? { save: hostSave, face } : undefined,
+      });
     });
     this.begin();
-    this.chatLine(null, `Joined "${this.worldName}"`);
+    if (this.isHost) this.chatLine(null, `World "${this.worldName}" is open! Room code: ${this.code}`);
+    else this.chatLine(null, `Joined "${this.worldName}"`);
   }
 
   disconnected() {
     if (!this.running) return;
     this.stop();
-    this.onExit('Lost connection to the host.', { rejoin: this.code });
+    this.onExit('Lost connection to the game server.', { rejoin: this.code, hostSave: this.isHost ? this.save : null });
   }
 
-  onHostData(d) {
+  onServerData(d) {
     if (!this.world) return;
-    if (d.t === 'face') { setMobFace(d.face || null).catch(() => setMobFace(null)); return; }
-    if (d.t === 'roster') {
+    if (d.t === 's') this.applySnapshot(d);
+    else if (d.t === 'face') {
+      this.face = d.face || null;
+      setMobFace(this.face).catch(() => setMobFace(null));
+      this.updateFacePreview();
+    } else if (d.t === 'save') {
+      // The host's browser keeps the world save; the server sends updates.
+      if (!this.isHost || !d.save) return;
+      this.save = d.save;
+      this.persist();
+      if (this.onSaved) { this.onSaved(); this.onSaved = null; }
+    } else if (d.t === 'roster') {
       this.roster = new Map(d.list.map(([id, name, look]) => [id, { name, look }]));
       for (const id of this.cl.players.keys()) if (!this.roster.has(id)) this.cl.players.delete(id);
     } else if (d.t === 'chat') {
       this.chatLine(d.from, d.m);
-      this.audio.sfx('ui');
-    } else if (d.t === 's') {
-      this.applySnapshot(d);
+      if (d.from !== this.profile.name) this.audio.sfx('ui');
     }
+  }
+
+  // Host only: change the photo-face the monsters wear, and tell everyone.
+  setFace(face) {
+    saveMobFace(face || null);
+    this.conn.send({ t: 'face', face: face || null });
+  }
+
+  updateFacePreview() {
+    const img = $('face-preview');
+    if (this.isHost && this.face) { img.src = this.face; img.classList.remove('hidden'); }
+    else img.classList.add('hidden');
+    $('menu-face-clear').classList.toggle('hidden', !(this.isHost && this.face));
+  }
+
+  persist() {
+    if (this.isHost && this.save) storeWorld(this.save);
+  }
+
+  // Host only: ask the server for the latest save (resolves once it's stored).
+  requestSave() {
+    return new Promise((resolve) => {
+      if (!this.isHost || !this.conn.open) return resolve(this.save);
+      const t = setTimeout(() => resolve(this.save), 3000);
+      this.onSaved = () => { clearTimeout(t); resolve(this.save); };
+      this.conn.send({ t: 'save' });
+    });
   }
 
   applySnapshot(s) {
@@ -244,7 +186,7 @@ export class Game {
     }
   }
 
-  // ---------------------------------------------------------------- shared
+  // ---------------------------------------------------------------- running
 
   begin() {
     this.running = true;
@@ -253,24 +195,25 @@ export class Game {
     this.onVisible = () => {
       if (document.visibilityState !== 'visible' || !this.running) return;
       this.keepAwake();
-      if (this.peer && this.peer.disconnected && !this.peer.destroyed) this.peer.reconnect();
-      if (this.mode === 'client') this.lastSnapAt = Math.max(this.lastSnapAt, performance.now() - 6000);
+      this.lastSnapAt = Math.max(this.lastSnapAt, performance.now() - 6000);
     };
     document.addEventListener('visibilitychange', this.onVisible);
-    // Watchdog (timers keep running when frames don't): a client that hears nothing from
-    // the host for 10 seconds treats the connection as lost and starts reconnecting.
+    // Watchdog (timers keep running when frames don't): hearing nothing from the
+    // server for 10 seconds means the connection is lost, so start reconnecting.
     this.watchdog = setInterval(() => {
       this.layoutHud();
-      if (this.mode === 'client' && this.running && document.visibilityState === 'visible' &&
+      if (this.running && document.visibilityState === 'visible' &&
           performance.now() - this.lastSnapAt > 10000) this.disconnected();
     }, 1000);
+    // Keep telling the server we're here while the tab is in the background.
+    this.bgTimer = setInterval(() => { if (document.hidden && this.running) this.conn.send({ t: 'ping' }); }, 5000);
     this.last = performance.now();
     $('hud').classList.remove('hidden');
     $('hud-room').innerHTML = `Room <b>${escapeHtml(this.code || '')}</b>`;
     $('hud-name').textContent = this.profile.name;
-    document.querySelectorAll('.host-only').forEach((el) => el.classList.toggle('hidden', this.mode !== 'host'));
+    document.querySelectorAll('.host-only').forEach((el) => el.classList.toggle('hidden', !this.isHost));
     this.bindUi();
-    if (this.mode === 'host') this.updateFacePreview();
+    this.updateFacePreview();
     const loop = (now) => {
       if (!this.running) return;
       const dt = Math.max(0, Math.min(0.1, (now - this.last) / 1000));
@@ -279,20 +222,9 @@ export class Game {
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
-    if (this.mode === 'host') {
-      // Keep the world running even when the host's tab is in the background.
-      this.bgTimer = setInterval(() => {
-        if (document.hidden && this.running) {
-          const now = performance.now();
-          const dt = Math.min(0.25, (now - this.last) / 1000);
-          this.last = now;
-          this.tickHost(dt);
-        }
-      }, 50);
-    }
   }
 
-  // Stop phones from going to sleep mid-game (a sleeping host freezes the whole world).
+  // Stop phones from going to sleep mid-game.
   async keepAwake() {
     try {
       if (navigator.wakeLock && (!this.wakeLock || this.wakeLock.released)) this.wakeLock = await navigator.wakeLock.request('screen');
@@ -302,10 +234,10 @@ export class Game {
   stop() {
     this.running = false;
     clearInterval(this.watchdog);
+    clearInterval(this.bgTimer);
     document.removeEventListener('visibilitychange', this.onVisible);
     try { this.wakeLock && this.wakeLock.release(); } catch { /* ignore */ }
     cancelAnimationFrame(this.raf);
-    clearInterval(this.bgTimer);
     this.unbindUi?.();
     $('hud').classList.add('hidden');
     $('shop').classList.add('hidden');
@@ -314,8 +246,8 @@ export class Game {
     $('chat-log').innerHTML = '';
     $('chat-history').innerHTML = '';
     this.toggleChat(false);
-    if (this.mode === 'host') this.persist();
-    try { this.peer && this.peer.destroy(); } catch { /* ignore */ }
+    this.persist();
+    this.conn.close();
     setMobFace(null);
   }
 
@@ -325,65 +257,21 @@ export class Game {
   }
 
   // Me = the object that represents the local player's position.
-  get me() {
-    if (this.mode === 'host') return this.sim.players.get('h');
-    return this.self;
-  }
+  get me() { return this.self; }
 
-  myStats() {
-    if (this.mode === 'host') {
-      const v = this.sim.privateView('h');
-      return v;
-    }
-    return this.priv;
-  }
+  myStats() { return this.priv; }
 
   frame(dt) {
     this.handleKeys();
     this.moveLocal(dt);
-    if (this.mode === 'host') this.tickHost(dt);
-    else this.tickClient(dt);
+    this.tickNet(dt);
     const view = this.buildView(dt);
     this.renderer.draw(view, dt);
     this.updateHud(view);
     this.input.endFrame();
   }
 
-  tickHost(dt) {
-    this.acc += dt;
-    let steps = 0;
-    while (this.acc >= STEP && steps < 8) {
-      this.sim.update(STEP);
-      this.acc -= STEP;
-      steps++;
-    }
-    if (steps === 8) this.acc = 0;
-    const evs = this.sim.events;
-    this.sim.events = [];
-    for (const e of evs) this.handleEvent(e);
-    this.netEvents.push(...evs);
-
-    this.netT -= dt;
-    if (this.netT <= 0) {
-      this.netT = NET_RATE;
-      if (this.conns.size) {
-        const snap = this.sim.snapshot();
-        snap.fx = this.netEvents.filter((e) => e.k !== 'dmg').concat(this.netEvents.filter((e) => e.k === 'dmg').slice(-50));
-        for (const [id, c] of this.conns) {
-          if (!c.open) continue;
-          try { c.send({ ...snap, me: this.sim.privateView(id) }); } catch (err) { console.warn(err); }
-        }
-      }
-      this.netEvents = [];
-    }
-    // Friends whose game went silent (closed tab, lost signal) are dropped so they can rejoin cleanly.
-    const now = performance.now();
-    for (const [id, t] of this.lastSeen) if (now - t > 12000) this.dropClient(id);
-    this.saveT += dt;
-    if (this.saveT > 30) { this.saveT = 0; this.persist(); }
-  }
-
-  tickClient(dt) {
+  tickNet(dt) {
     const C = this.cl;
     const k = Math.min(1, dt * 14);
     for (const p of C.players.values()) {
@@ -395,12 +283,19 @@ export class Game {
     for (const q of C.projs.values()) { q.x += q.vx * dt; q.y += q.vy * dt; }
     for (const p of C.pickups.values()) { p.x += (p.tx - p.x) * k; p.y += (p.ty - p.y) * k; }
 
+    // Send our position when it changes (15 times a second at most), and a
+    // keep-alive every couple of seconds when standing still.
     this.netT -= dt;
-    if (this.netT <= 0 && this.conn.open) {
-      this.netT = 1 / 20;
-      const s = this.self;
-      this.conn.send({ t: 'in', x: Math.round(s.x * 100) / 100, y: Math.round(s.y * 100) / 100, dir: s.dir, mv: s.mv, dash: s.dash, tpn: s.tpn });
-    }
+    this.idleT -= dt;
+    if (this.netT > 0 || !this.conn.open) return;
+    const s = this.self;
+    const msg = { t: 'in', x: Math.round(s.x * 100) / 100, y: Math.round(s.y * 100) / 100, dir: s.dir, mv: s.mv, dash: s.dash, tpn: s.tpn };
+    const key = JSON.stringify(msg);
+    if (key === this.lastInput && this.idleT > 0) return;
+    this.lastInput = key;
+    this.netT = INPUT_RATE;
+    this.idleT = IDLE_RATE;
+    this.conn.send(msg);
   }
 
   moveLocal(dt) {
@@ -453,33 +348,23 @@ export class Game {
   }
 
   pauseInfo() {
-    return this.mode === 'host' ? this.sim.pauseInfo() : (this.state && this.state.pz) || null;
+    return (this.state && this.state.pz) || null;
   }
 
   buildView() {
-    let players, enemies, projs, pickups, time, phase;
-    if (this.mode === 'host') {
-      const sim = this.sim;
-      players = [...sim.players.values()].map((p) => ({
-        id: p.id, name: p.name, look: p.look, x: p.x, y: p.y, dir: p.dir, mv: p.mv, hp: p.hp, maxHp: p.maxHp,
-        dead: p.dead, au: p.weapons.aura || 0, bl: p.weapons.blades || 0, rv: Math.round(p.reviveP * 100), dash: p.dash, ready: p.ready, level: p.level, gs: p.giantT || 0,
-      }));
-      enemies = sim.enemies; projs = sim.projs; pickups = sim.pickups; time = sim.t; phase = sim.phase;
-    } else {
-      players = [];
-      for (const p of this.cl.players.values()) {
-        const r = this.roster.get(p.id);
-        if (!r) continue;
-        const o = { ...p, name: r.name, look: r.look };
-        if (p.id === this.myId) { o.x = this.self.x; o.y = this.self.y; o.dir = this.self.dir; o.mv = this.self.mv; o.dash = this.self.dash; }
-        players.push(o);
-      }
-      enemies = [...this.cl.enemies.values()];
-      projs = [...this.cl.projs.values()];
-      pickups = [...this.cl.pickups.values()];
-      time = this.serverT + (performance.now() - (this.serverTAt || performance.now())) / 1000;
-      phase = this.state.ph;
+    const players = [];
+    for (const p of this.cl.players.values()) {
+      const r = this.roster.get(p.id);
+      if (!r) continue;
+      const o = { ...p, name: r.name, look: r.look };
+      if (p.id === this.myId) { o.x = this.self.x; o.y = this.self.y; o.dir = this.self.dir; o.mv = this.self.mv; o.dash = this.self.dash; }
+      players.push(o);
     }
+    const enemies = [...this.cl.enemies.values()];
+    const projs = [...this.cl.projs.values()];
+    const pickups = [...this.cl.pickups.values()];
+    const time = this.serverT + (performance.now() - (this.serverTAt || performance.now())) / 1000;
+    const phase = this.state.ph;
     const me = players.find((p) => p.id === this.myId) || null;
     return { world: this.world, players, enemies, projs, pickups, me, meId: this.myId, time, phase };
   }
@@ -487,7 +372,7 @@ export class Game {
   // ---------------------------------------------------------------- events & UI
 
   handleEvent(e) {
-    const players = this.mode === 'host' ? [...this.sim.players.values()] : [...this.cl.players.values()];
+    const players = [...this.cl.players.values()];
     this.renderer.event(e, players);
     const mine = e.id === this.myId;
     switch (e.k) {
@@ -580,13 +465,11 @@ export class Game {
     const m = chat.value.trim();
     chat.value = '';
     if (!m) return;
-    if (this.mode === 'host') this.broadcastChat(this.profile.name, m);
-    else if (this.conn.open) this.conn.send({ t: 'chat', m });
+    if (this.conn.open) this.conn.send({ t: 'chat', m });
   }
 
   act(a, v) {
-    if (this.mode === 'host') this.sim.action('h', a, v);
-    else if (this.conn.open) this.conn.send({ t: 'act', a, v });
+    if (this.conn.open) this.conn.send({ t: 'act', a, v });
   }
 
   nearMerchant() {
@@ -642,32 +525,29 @@ export class Game {
     on('menu-resume', 'click', () => $('menu').classList.add('hidden'));
     on('menu-leave', 'click', () => this.leave());
     on('menu-mute', 'click', () => this.toggleMute());
-    on('menu-save', 'click', () => { this.persist(); $('menu-status').textContent = 'World saved!'; });
+    on('menu-save', 'click', async () => { await this.requestSave(); $('menu-status').textContent = 'World saved!'; });
     on('face-file', 'change', async (e) => {
       const f = e.target.files[0];
       e.target.value = '';
-      if (!f || this.mode !== 'host') return;
+      if (!f || !this.isHost) return;
       try {
         const face = await processFacePhoto(f);
-        await this.setFace(face);
+        this.setFace(face);
         $('menu-status').textContent = 'Monsters have a new face!';
       } catch (err) { $('menu-status').textContent = err.message; }
     });
     on('menu-face-clear', 'click', async () => {
-      await this.setFace(null);
+      this.setFace(null);
       $('menu-status').textContent = 'Monsters are back to normal.';
     });
     on('menu-export', 'click', async () => {
-      this.persist();
       const { exportWorld } = await import('./save.js');
-      exportWorld(this.sim.snapshotSave());
+      exportWorld(await this.requestSave());
     });
     on('menu-invite', 'click', () => {
       const q = new URLSearchParams(location.search);
       q.delete('join'); q.delete('relay');
       q.set('join', this.code);
-      const relay = loadRelay();
-      if (relay) q.set('relay', encodeRelay(relay));
       const url = `${location.origin}${location.pathname}?${q.toString()}`;
       navigator.clipboard?.writeText(url).then(
         () => { $('menu-status').textContent = 'Invite link copied!'; },
@@ -699,10 +579,7 @@ export class Game {
   updateHud(view) {
     const st = this.myStats();
     if (!st) return;
-    const phase = this.mode === 'host' ? this.sim.phase : this.state.ph;
-    const wave = this.mode === 'host' ? this.sim.wave : this.state.w;
-    const left = this.mode === 'host' ? this.sim.spawnLeft + this.sim.enemies.length : this.state.left;
-    const pt = this.mode === 'host' ? Math.ceil(this.sim.phaseT) : this.state.pt;
+    const { ph: phase, w: wave, left, pt } = this.state;
 
     $('hud-lv').textContent = st.lv;
     $('hud-hp').style.width = `${Math.max(0, (100 * st.hp) / st.mhp)}%`;
@@ -789,10 +666,4 @@ export class Game {
 
     this.audio.playSong(phase === 'wave' ? 'battle' : 'camp');
   }
-}
-
-function sanitizeLook(l) {
-  const n = (v, max) => Math.max(0, Math.min(max, Number(v) | 0));
-  l = l || {};
-  return { skin: n(l.skin, 5), hair: n(l.hair, 7), hairColor: n(l.hairColor, 7), outfit: n(l.outfit, 5), outfitColor: n(l.outfitColor, 7) };
 }

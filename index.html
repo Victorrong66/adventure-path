@@ -85,24 +85,6 @@
           <canvas id="set-face-demo" class="face-demo hidden" width="300" height="64"></canvas>
         </div>
         <div class="setting">
-          <h3>Multiplayer Relay</h3>
-          <p class="small">The game already has a built-in relay for friends on other networks
-            (like mobile data). If joining still fails, you can add another TURN relay here.
-            Your invite link shares it with friends.</p>
-          <label class="field">Relay address(es)
-            <textarea id="relay-urls" rows="2" placeholder="turn:relay.example.com:443?transport=tcp" autocomplete="off" spellcheck="false"></textarea>
-          </label>
-          <div class="relay-row">
-            <label class="field">Username <input id="relay-user" autocomplete="off" spellcheck="false"></label>
-            <label class="field">Password <input id="relay-pass" autocomplete="off" spellcheck="false"></label>
-          </div>
-          <p id="relay-state" class="small"></p>
-          <div class="row">
-            <button class="btn primary" id="relay-save">Save Relay</button>
-            <button class="btn hidden" id="relay-clear">Remove</button>
-          </div>
-        </div>
-        <div class="setting">
           <h3>Sound</h3>
           <button class="btn" id="set-mute">Sound: On</button>
         </div>
@@ -230,7 +212,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="js/vendor/peerjs.min.js"></script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

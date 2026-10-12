@@ -3,7 +3,7 @@ import { Renderer } from './render.js';
 import { Audio8 } from './audio.js';
 import { Input } from './input.js';
 import { Game } from './game.js';
-import { hostWorld, joinWorld, normalizeCode } from './net.js';
+import { connectRoom, makeCode, normalizeCode } from './net.js';
 import { newWorldSave } from './sim.js';
 import { World } from './world.js';
 import {
@@ -11,7 +11,7 @@ import {
   processFacePhoto, setMobFace, monsterSprite,
 } from './sprites.js';
 import {
-  loadMobFace, saveMobFace, loadRelay, saveRelay, parseRelay, decodeRelay,
+  loadMobFace, saveMobFace,
   loadProfile, saveProfile, listWorlds, getWorld, storeWorld, deleteWorld, exportWorld, importWorld,
 } from './save.js';
 import { escapeHtml } from './util.js';
@@ -41,7 +41,7 @@ function show(name) {
   if (name === 'title') refreshTitle();
   if (name === 'host') renderWorldList();
   if (name === 'char') openCreator();
-  if (name === 'settings') { refreshSettings(); refreshRelay(); }
+  if (name === 'settings') refreshSettings();
 }
 
 document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', () => { clearTimeout(rejoinTimer); show('title'); }));
@@ -108,22 +108,6 @@ $('set-face-clear').addEventListener('click', () => {
   refreshSettings();
 });
 $('set-mute').addEventListener('click', () => { audio.toggleMute(); refreshSettings(); });
-
-function refreshRelay() {
-  const r = loadRelay();
-  $('relay-urls').value = r ? r.urls.join('\n') : '';
-  $('relay-user').value = r ? r.username : '';
-  $('relay-pass').value = r ? r.credential : '';
-  $('relay-state').textContent = r ? `Using your relay (${r.urls.length} address${r.urls.length > 1 ? 'es' : ''}).` : 'Using the built-in relays.';
-  $('relay-clear').classList.toggle('hidden', !r);
-}
-$('relay-save').addEventListener('click', () => {
-  const r = parseRelay($('relay-urls').value, $('relay-user').value, $('relay-pass').value);
-  saveRelay(r);
-  $('settings-status').textContent = r ? 'Relay saved. Share your invite link so friends get it too.' : 'Relay removed.';
-  refreshRelay();
-});
-$('relay-clear').addEventListener('click', () => { saveRelay(null); $('settings-status').textContent = 'Relay removed.'; refreshRelay(); });
 
 // ------------------------------------------------------------------ title background
 // The menus sit on top of a live view of a demo world.
@@ -234,10 +218,12 @@ function renderWorldList() {
     <div class="world">
       <div class="info"><b>${escapeHtml(w.name)}</b>
         <div class="meta">Wave ${w.checkpoint || 1} &middot; Best ${w.bestWave || 0} &middot; ${w.kills || 0} kills &middot; ${Object.keys(w.players || {}).length} heroes</div>
+        <div class="meta">Room code: ${escapeHtml(w.code || 'new one when you play')}</div>
         <div class="meta">Saved ${new Date(w.updated || w.created).toLocaleString()}</div>
       </div>
       <button class="btn primary" data-load="${w.id}">Play</button>
       <button class="btn tiny" data-export="${w.id}">Export</button>
+      <button class="btn tiny" data-newcode="${w.id}" title="Old codes stop working">New Code</button>
       <button class="btn tiny danger" data-del="${w.id}">Delete</button>
     </div>`).join('') : '<p class="small">No saved worlds yet. Make one below!</p>';
 }
@@ -246,7 +232,12 @@ $('world-list').addEventListener('click', (e) => {
   const load = e.target.closest('[data-load]');
   const exp = e.target.closest('[data-export]');
   const del = e.target.closest('[data-del]');
+  const nc = e.target.closest('[data-newcode]');
   if (load) startHosting(getWorld(load.dataset.load));
+  if (nc) {
+    const w = getWorld(nc.dataset.newcode);
+    if (w) { w.code = makeCode(); storeWorld(w); renderWorldList(); $('host-status').textContent = `New room code: ${w.code}. The old one no longer works.`; }
+  }
   if (exp) exportWorld(getWorld(exp.dataset.export));
   if (del) {
     const w = getWorld(del.dataset.del);
@@ -269,23 +260,23 @@ $('import-file').addEventListener('change', async (e) => {
   catch (err) { $('host-status').textContent = err.message; $('host-status').classList.add('err'); }
 });
 
+// Each world keeps its room code, so friends can rejoin with the same code next time.
 async function startHosting(save) {
   if (!save) return;
   const status = $('host-status');
   status.classList.remove('err');
   status.textContent = 'Opening your world...';
   audio.init();
-  const g = new Game({ mode: 'host', profile, renderer, audio, input, onExit: endGame });
-  try {
-    await g.startHost(save, hostWorld);
-  } catch (err) {
-    status.textContent = err.message + ' (You can still play solo: try again or check your connection.)';
-    status.classList.add('err');
-    return;
+  if (!save.code) { save.code = makeCode(); storeWorld(save); }
+  let err = await tryJoin(save.code, save);
+  if (err && err.code === 'taken') {
+    // Another world is using this code right now (very unlikely): pick a new one.
+    save.code = makeCode();
+    storeWorld(save);
+    err = await tryJoin(save.code, save);
   }
-  game = g;
-  show(null);
-  showToast(`Room code: ${g.code} — share it with your friends!`, 5000);
+  if (err) { status.textContent = err.message; status.classList.add('err'); return; }
+  showToast(`Room code: ${game.code} — share it with your friends!`, 5000);
 }
 
 // ------------------------------------------------------------------ joining
@@ -295,19 +286,19 @@ $('join-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('bt
 let rejoinTimer = null;
 let joining = false;
 
-async function tryJoin(code) {
-  let peer = null;
+// Join a room (or open it, when hostSave is given). Returns null, or the error.
+async function tryJoin(code, hostSave = null) {
+  let conn = null;
   try {
-    const res = await joinWorld(code);
-    peer = res.peer;
-    const g = new Game({ mode: 'client', profile, renderer, audio, input, onExit: endGame });
-    await g.startClient(res.peer, res.conn);
+    conn = await connectRoom(code);
+    const g = new Game({ profile, renderer, audio, input, onExit: endGame });
+    await g.start(conn, hostSave);
     game = g;
     show(null);
     return null;
   } catch (err) {
-    try { peer && peer.destroy(); } catch { /* ignore */ }
-    return err.message;
+    try { conn && conn.close(); } catch { /* ignore */ }
+    return err;
   }
 }
 
@@ -323,11 +314,12 @@ $('btn-join-go').addEventListener('click', async () => {
   joining = true;
   const err = await tryJoin(code);
   joining = false;
-  if (err) { status.textContent = err; status.classList.add('err'); }
+  if (err) { status.textContent = err.message; status.classList.add('err'); }
 });
 
 // After a dropped connection, keep trying to get back in for about a minute.
-function autoRejoin(code, attempt = 1) {
+// The host re-opens the world from their save if the room has closed meanwhile.
+function autoRejoin(code, hostSave, attempt = 1) {
   const MAX = 8;
   const status = $('join-status');
   status.classList.remove('err');
@@ -335,11 +327,12 @@ function autoRejoin(code, attempt = 1) {
   rejoinTimer = setTimeout(async () => {
     if ($('scr-join').classList.contains('hidden')) return; // player left this screen
     joining = true;
-    const err = await tryJoin(code);
+    const err = await tryJoin(code, hostSave && (getWorld(hostSave.id) || hostSave));
     joining = false;
     if (!err) { showToast('Reconnected!', 2500); return; }
-    if (attempt < MAX && !$('scr-join').classList.contains('hidden')) autoRejoin(code, attempt + 1);
-    else { status.textContent = `${err} (Tap Join to try again.)`; status.classList.add('err'); }
+    if (err.code === 'dupe' || err.code === 'full') { status.textContent = err.message; status.classList.add('err'); return; }
+    if (attempt < MAX && !$('scr-join').classList.contains('hidden')) autoRejoin(code, hostSave, attempt + 1);
+    else { status.textContent = `${err.message} (Tap Join to try again.)`; status.classList.add('err'); }
   }, Math.min(8000, 1500 * attempt));
 }
 
@@ -348,7 +341,7 @@ function endGame(message, opts = {}) {
   if (opts.rejoin) {
     show('join');
     $('join-code').value = opts.rejoin;
-    autoRejoin(opts.rejoin);
+    autoRejoin(opts.rejoin, opts.hostSave);
     return;
   }
   show('title');
@@ -367,11 +360,6 @@ function showToast(msg, ms = 3000) {
 // ------------------------------------------------------------------ boot
 
 const joinParam = new URLSearchParams(location.search).get('join');
-const relayParam = new URLSearchParams(location.search).get('relay');
-if (relayParam) {
-  const r = decodeRelay(relayParam);
-  if (r) saveRelay(r);
-}
 show('title');
 if (joinParam) {
   $('join-code').value = normalizeCode(joinParam);

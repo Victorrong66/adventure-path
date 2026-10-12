@@ -18,24 +18,25 @@ whichever of these is available:
 The files should be:
 - `index.html`, `style.css`, `README.md`
 - `js/`: `main.js`, `game.js`, `sim.js`, `world.js`, `render.js`, `scenery.js`, `sprites.js`, `audio.js`, `input.js`, `net.js`, `save.js`, `util.js`
-- `js/vendor/peerjs.min.js` and `js/vendor/PEERJS_LICENSE`
-- `.github/workflows/pages.yml` (deploys the repo root to GitHub Pages on every push to `main`)
+- `server/worker.js` (the Cloudflare Worker + Durable Object game server)
+- `wrangler.jsonc`, `.assetsignore`, `package.json`, `package-lock.json`, `.gitignore`
+- `.github/workflows/deploy.yml` (deploys to Cloudflare on every push to `main`; needs the
+  `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets)
 - `docs/rebuild-prompt.md` and `docs/new-chat-prompt.md`
 
 Then:
 1. Check that all the files are there, and update the README if the repo name or website link changed.
-2. Test it: serve the folder locally, run a local PeerJS server (the `peer` npm package), and use
-   headless Chromium (Playwright) to have one browser host a world and another join with the room code.
-   Both should ready up and fight a wave. Load the page with
-   `?peerhost=127.0.0.1&peerport=9000` so it uses the local server. Fix anything that's broken.
+2. Test it: run `npm install` and `npx wrangler dev --port 8787 --persist-to <a folder outside the repo>`
+   (state inside the repo makes the dev server reload in a loop), then use headless Chromium
+   (Playwright) to have one browser host a world and another join with the room code.
+   Both should ready up and fight a wave. Fix anything that's broken.
 3. Commit and push to `main` (or open a pull request for me to merge, if you can't push to `main`).
-4. Tell me step by step how to turn on the website: **Settings → Pages → Source → GitHub Actions**.
-   Then re-run the "Deploy to GitHub Pages" workflow if its first run failed (it fails if Pages
-   wasn't turned on yet). Give me the final link, which will look like
-   `https://<my-username>.github.io/<repo-name>/`.
+4. Tell me step by step how to set up Cloudflare (free plan): make an account, create an API token
+   from the "Edit Cloudflare Workers" template, copy the Account ID, add both as GitHub repository
+   secrets (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`), then re-run the "Deploy to Cloudflare"
+   workflow. Give me the final link, which will look like `https://victors-world.<subdomain>.workers.dev`.
 
 Things to know:
-- The multiplayer relay credentials in `js/net.js` (ExpressTURN) are mine and are meant to be in the code.
 - Never commit any photos. The Monster Face Photo option keeps the picture only in the host's browser.
 - Saved worlds live in each player's browser (localStorage), and that storage is tied to the
   website address. A new address starts with no saves. To keep a world, the host uses
