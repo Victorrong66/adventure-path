@@ -1,5 +1,5 @@
-// Heroes come from a hand-made sprite sheet (assets/hero.png, built from
-// tools/hero-sheet.png by tools/build-hero.py) and are recoloured per player:
+// Heroes come from sprite sheets (assets/hero.png, built from tools/hero-sheet.png
+// and tools/hero-swing.png by tools/build-hero.py) and are recoloured per player:
 // the cloak takes the outfit colour, hair and skin take the player's picks, and
 // the leather/tunic is tinted by the outfit type.
 //
@@ -55,7 +55,8 @@ const TUNIC = {
 
 // One frame, recoloured for `look` = { skin, hair, outfitColor (hex), outfit (name) }.
 // kind: 'front' | 'back' (5 frames), 'side' | 'sideL' (9-frame walks right / left),
-// 'atk' | 'atkL' (7-frame swings right / left), 'hurt', 'down', 'win'.
+// 'atkF' | 'atkB' | 'atk' | 'atkL' (5-frame swings: towards you, away, right, left),
+// 'hurt', 'down', 'win'.
 // Returns { img, ox, oy } with the feet at (ox, oy).
 export const heroFrameCount = (kind) => HERO_FRAMES[kind].length;
 

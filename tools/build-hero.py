@@ -34,8 +34,7 @@ def clear_checker(im):
 im = clear_checker(Image.open('tools/hero-sheet.png'))
 # Frame boxes on the sheet (x0, y0, x1, y1). Rows: front (5), walk right (9),
 # walk left (9), back (5), swing right (7), swing left (7, drawn mirrored so listed
-# right-to-left), then hurt / knocked out / victory. The slash frames include
-# their slash trail.
+# right-to-left), then hurt / knocked out / victory.
 F = {
  'front': [(355,21,448,167),(475,16,571,174),(608,16,700,174),(731,16,828,167),(862,16,958,169)],
  'side':  [(38,189,167,353),(165,190,299,354),(300,190,432,352),(434,191,566,354),(567,192,709,358),
@@ -43,10 +42,6 @@ F = {
  'sideL': [(63,369,195,535),(209,371,327,536),(337,371,469,534),(470,373,608,534),(609,376,752,539),
            (755,377,881,539),(883,378,1013,540),(1016,378,1143,540),(1146,377,1275,539)],
  'back':  [(338,554,439,716),(462,554,568,716),(604,554,703,717),(736,555,837,715),(867,555,967,717)],
- 'atk':   [(49,723,205,867),(210,725,358,867),(357,724,536,867),(523,727,657,866),(684,733,946,869),
-           (955,729,1091,868),(1123,724,1263,867)],
- 'atkL':  [(1133,883,1285,1027),(980,883,1127,1026),(804,883,981,1025),(681,884,815,1027),(371,884,641,1028),
-           (225,887,361,1028),(51,884,192,1026)],
  'hurt':  [(62,1060,187,1181)],
  'down':  [(493,1097,656,1178)],
  'win':   [(1133,1027,1241,1183)],
@@ -63,8 +58,7 @@ def classify(r, g, b, x, y, w, h, name):
     if 8 < hue < 42 and l >= 0.5 and s > 0.3: return 'skin'   # face and hands, lit and shaded
     if 8 < hue < 45 and l < 0.5:
         if name == 'down': return 'hair' if x > w * 0.55 else 'tunic'
-        head = 0.42 if name.startswith('atk') else 0.45
-        return 'hair' if y < h * head else 'tunic'
+        return 'hair' if y < h - 18 else 'tunic'  # head: more than 18px above the feet
     return 'keep'
 
 def keep_big(c, min_px=3000):
@@ -83,6 +77,13 @@ def keep_big(c, min_px=3000):
                 for cx, cy in comp: px[cx, cy] = (0, 0, 0, 0)
     return c
 
+# The swing sheet (tools/hero-swing.png) is a 5x4 grid, each row one 5-frame swing
+# read left to right: facing the viewer, facing right, facing away, facing left.
+SWING_ROWS = ['atkF', 'atk', 'atkB', 'atkL']
+K_SWING = K / 1.25  # the swing sheet draws the hero about 25% bigger
+swing = clear_checker(Image.open('tools/hero-swing.png'))
+SW, SH = swing.size
+
 frames = []
 for name, boxes in F.items():
     for (x0, y0, x1, y1) in boxes:
@@ -97,11 +98,47 @@ for name, boxes in F.items():
                 px[x, y] = (r, g, b, ROLE[role])
         frames.append((name, sm))
 
+def components(im, min_px):
+    """Connected shapes in im as (pixels, centre x, centre y), ignoring specks."""
+    px = im.load(); W, H = im.size; seen = bytearray(W * H); out = []
+    for y in range(H):
+        for x in range(W):
+            if not px[x, y][3] or seen[y * W + x]: continue
+            st = [(x, y)]; seen[y * W + x] = 1; comp = []
+            while st:
+                cx, cy = st.pop(); comp.append((cx, cy))
+                for nx, ny in ((cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)):
+                    if 0 <= nx < W and 0 <= ny < H and not seen[ny * W + nx] and px[nx, ny][3]:
+                        seen[ny * W + nx] = 1; st.append((nx, ny))
+            if len(comp) >= min_px:
+                out.append((comp, sum(p[0] for p in comp) / len(comp), sum(p[1] for p in comp) / len(comp)))
+    return out
+
+# each shape (body + raised sword, or a separate slash trail) belongs to the cell its centre is in
+swing_parts = components(swing, 400)
+for r, name in enumerate(SWING_ROWS):
+    for c in range(5):
+        cx0, cy0, cx1, cy1 = c * SW / 5, r * SH / 4, (c + 1) * SW / 5, (r + 1) * SH / 4
+        cell = Image.new('RGBA', swing.size, (0, 0, 0, 0)); cp = cell.load(); sp = swing.load()
+        for comp, mx, my in swing_parts:
+            if cx0 <= mx < cx1 and cy0 <= my < cy1:
+                for x, y in comp: cp[x, y] = sp[x, y]
+        cell = cell.crop(cell.getbbox())
+        sm = cell.resize((max(1, round(cell.width * K_SWING)), max(1, round(cell.height * K_SWING))), Image.BOX)
+        px = sm.load()
+        for y in range(sm.height):
+            for x in range(sm.width):
+                rr, gg, bb, a = px[x, y]
+                if a <= 140: px[x, y] = (0, 0, 0, 0); continue
+                px[x, y] = (rr, gg, bb, ROLE[classify(rr, gg, bb, x, y, sm.width, sm.height, name)])
+        frames.append((name, sm))
+
 # pack into one strip, bottoms aligned; record each frame's foot anchor
 def anchor(f, name):
     if name == 'down': return f.width // 2
     px = f.load(); xs = []
-    for y in range(int(f.height * 0.25)):
+    rows = range(f.height - 3, f.height) if name.startswith('atk') else range(int(f.height * 0.25))
+    for y in rows:
         for x in range(f.width):
             if px[x, y][3]: xs.append(x)
     xs.sort()
@@ -115,7 +152,7 @@ for name, f in frames:
     x += f.width + 1
 atlas.save('assets/hero.png')
 open('js/hero-frames.js', 'w').write(
-    '// Generated from the hero sprite sheet: [x, y, w, h, footX] per frame.\n'
+    '// Generated from the hero sprite sheets by tools/build-hero.py: [x, y, w, h, anchorX] per frame.\n'
     '// Alpha encodes recolour roles: 255 keep, 254 cloak, 253 hair, 252 skin, 251 tunic.\n'
     'export const HERO_FRAMES = ' + json.dumps(meta) + ';\n')
 print('wrote assets/hero.png and js/hero-frames.js', {k: len(v) for k, v in meta.items()})

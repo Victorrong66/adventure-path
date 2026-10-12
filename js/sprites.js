@@ -86,7 +86,10 @@ function fromTemplate(rows, pal, margin = 1, doOutline = true) {
 const charCache = new Map();
 
 // Which way each sheet frame faces; anything else is mirrored to fit.
-const NATIVE = { front: 'down', back: 'up', side: 'right', sideL: 'left', atk: 'right', atkL: 'left', hurt: 'left', down: 'left', win: 'right' };
+const NATIVE = {
+  front: 'down', back: 'up', side: 'right', sideL: 'left',
+  atkF: 'down', atkB: 'up', atk: 'right', atkL: 'left', hurt: 'left', down: 'left', win: 'right',
+};
 
 // Heroes (see hero.js). Returns { img, ox, oy, w, h, hurt() }: draw img at
 // w x h at (footX - ox, footY - oy).
@@ -96,7 +99,7 @@ export function charSprite(look, facing, frame = 0, pose = 'walk') {
   const left = facing === 3 || (facing === 1 && pose !== 'walk' && pose !== 'idle');
   let kind;
   if (pose === 'walk' || pose === 'idle') kind = facing === 0 ? 'front' : facing === 1 ? 'back' : left ? 'sideL' : 'side';
-  else if (pose === 'atk') kind = left ? 'atkL' : 'atk';
+  else if (pose === 'atk') kind = ['atkF', 'atkB', 'atk', 'atkL'][facing] || 'atk'; // a 5-frame swing for each direction
   else kind = pose;
   const n = heroFrameCount(kind);
   const index = pose === 'idle' ? 0 : pose === 'atk' ? Math.min(n - 1, Math.floor(frame * n)) : ((frame % n) + n) % n;

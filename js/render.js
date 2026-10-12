@@ -12,7 +12,7 @@ import { bladePositions, auraRadius, giantAngle, GIANT_LEN } from './sim.js';
 
 const BG = '#0c1a10';
 const DETAIL = 2;
-const ATTACK_POSE = 0.34; // seconds a sword swing lasts (wind-up, slash, follow-through)
+const ATTACK_POSE = 0.3; // seconds a sword swing lasts (wind-up, slash, follow-through)
 
 export class Renderer {
   constructor(canvas) {
