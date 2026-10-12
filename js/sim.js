@@ -26,6 +26,7 @@ export const SHOP = [
 export const MAX_LEVEL = 5;
 export const SLASH_CD = 0.35;
 export const PICK_TIME = 30; // seconds everyone gets to choose a level-up before one is picked for them
+export const SHOP_TIME = 45; // seconds someone can keep the shop (and the game) paused
 
 const ENEMY = {
   slime: { hp: 14, spd: 1.1, dmg: 8, r: 0.35, xp: 1, minWave: 1, weight: 10 },
@@ -194,6 +195,10 @@ export class Sim {
       this.pick(p, v | 0);
     } else if (a === 'buy') {
       this.buy(p, v);
+    } else if (a === 'shop') {
+      // Shopping pauses the world for everyone (with a time limit).
+      p.shopping = !!v && !p.dead;
+      p.shopT = SHOP_TIME;
     } else if (a === 'attack') {
       this.slash(p, v);
     }
@@ -455,14 +460,22 @@ export class Sim {
 
   update(dt) {
     const all = [...this.players.values()];
-    // Level-up time: the whole world waits until every player has picked their upgrade.
+    // Level-up time (and shopping): the whole world waits until every player has
+    // picked their upgrade and closed the shop.
     const picking = all.filter((p) => p.choices.length);
-    if (picking.length) {
+    const shopping = all.filter((p) => p.shopping);
+    if (picking.length || shopping.length) {
       if (!this.paused) { this.paused = true; this.pickT = PICK_TIME; }
-      this.pickT -= dt;
-      if (this.pickT <= 0) {
-        for (const p of picking) this.pick(p, (Math.random() * p.choices.length) | 0);
-        this.pickT = PICK_TIME;
+      if (picking.length) {
+        this.pickT -= dt;
+        if (this.pickT <= 0) {
+          for (const p of picking) this.pick(p, (Math.random() * p.choices.length) | 0);
+          this.pickT = PICK_TIME;
+        }
+      } else this.pickT = PICK_TIME;
+      for (const p of shopping) {
+        p.shopT -= dt;
+        if (p.shopT <= 0) { p.shopping = false; this.emit({ k: 'msg', m: `${p.name}'s shopping time ran out` }); }
       }
       return;
     }
@@ -732,11 +745,18 @@ export class Sim {
     };
   }
 
-  // Who we're waiting on while paused for level-ups (null when not paused).
+  // Who we're waiting on while paused (null when not paused): n = picking a
+  // level-up (auto-pick in t seconds), s = shopping (shop closes in st seconds).
   pauseInfo() {
     if (!this.paused) return null;
-    const names = [...this.players.values()].filter((p) => p.choices.length).map((p) => p.name);
-    return names.length ? { n: names, t: Math.max(0, Math.ceil(this.pickT)) } : null;
+    const all = [...this.players.values()];
+    const n = all.filter((p) => p.choices.length).map((p) => p.name);
+    const shoppers = all.filter((p) => p.shopping);
+    if (!n.length && !shoppers.length) return null;
+    return {
+      n, t: Math.max(0, Math.ceil(this.pickT)),
+      s: shoppers.map((p) => p.name), st: Math.max(0, Math.ceil(Math.max(...shoppers.map((p) => p.shopT), 0))),
+    };
   }
 
   privateView(id) {
@@ -745,6 +765,7 @@ export class Sim {
     return {
       lv: p.level, xp: p.xp, xn: p.xpNext, g: p.gold, ch: p.choices, w: p.weapons, ps: p.passives,
       pm: p.perm, spd: p.spd, tpn: p.tpn, hp: Math.ceil(p.hp), mhp: p.maxHp, dead: p.dead,
+      sh: !!p.shopping, sht: Math.ceil(p.shopT || 0),
     };
   }
 }

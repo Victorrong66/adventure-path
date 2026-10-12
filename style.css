@@ -132,12 +132,12 @@ body.touch .touch-only { display: flex !important; }
 @media (pointer: coarse) {
   .hud-actions { bottom: 168px; flex-direction: column; align-items: flex-end; }
   .hud-actions .btn { padding: 8px 10px; font-size: 9px; margin: 2px; }
-  .chat { bottom: 150px; width: 58vw; }
   .weapons { display: none; }
+  .chat-log { max-height: 62px; }
 }
+body.touch .chat-log { max-height: 62px; }
 body.touch .hud-actions { bottom: 168px; flex-direction: column; align-items: flex-end; }
 body.touch .hud-actions .btn { padding: 8px 10px; font-size: 9px; margin: 2px; }
-body.touch .chat { bottom: 150px; width: 58vw; }
 body.touch .weapons { display: none; }
 
 /* Touch controls: joystick on the left, big attack / dash buttons on the right */
@@ -171,14 +171,15 @@ body.touch .weapons { display: none; }
 .choice .k { color: var(--muted); font-size: 8px; }
 .choice .d { font-size: 8px; color: #d8d0f0; }
 
-.chat { position: absolute; left: 12px; bottom: 12px; width: min(360px, 60vw); }
-.chat-log { font-size: 8px; line-height: 1.9; text-shadow: 1px 1px 0 var(--edge), 2px 2px 0 var(--edge); max-height: 140px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+.chat-log { margin-top: 8px; font-size: 8px; line-height: 1.9; text-shadow: 1px 1px 0 var(--edge), 2px 2px 0 var(--edge); max-height: 92px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+.chat-btn { font-size: 9px; padding: 7px 8px; }
+.shop-timer { color: var(--gold); min-height: 1em; }
 .chat-log div { transition: opacity .8s; }
 .chat-log div.old { opacity: 0; }
 .chat-log .sys, .chat-history .sys { color: var(--gold); }
 .chat-log .who, .chat-history .who { color: var(--blue); }
 .chat-panel {
-  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 50;
+  position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 50;
   width: min(460px, 92vw); max-height: 70vh; display: flex; flex-direction: column;
   background: var(--panel); padding: 12px; box-shadow: 0 0 0 4px var(--edge), 8px 8px 0 4px rgba(0,0,0,.4);
 }
@@ -226,3 +227,5 @@ textarea {
   .wave { font-size: 11px; }
 
 }
+/* Short (landscape phone) screens: keep big announcements clear of the chat lines at the top */
+@media (max-height: 500px) { .announce { top: 46%; font-size: 18px; } }

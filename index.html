@@ -135,13 +135,18 @@
       <div id="hud-weapons" class="weapons"></div>
     </div>
     <div class="hud-tc" id="hud-tc">
-      <div id="hud-wave" class="wave"></div>
-      <div id="hud-phase" class="phase"></div>
-      <div id="boss-bar" class="bar boss hidden"><i id="boss-hp"></i><span>OGRE KING</span></div>
+      <div id="hud-tc-main">
+        <div id="hud-wave" class="wave"></div>
+        <div id="hud-phase" class="phase"></div>
+        <div id="boss-bar" class="bar boss hidden"><i id="boss-hp"></i><span>OGRE KING</span></div>
+      </div>
+      <!-- Chat messages sit at the top, out of the way of thumbs on phones -->
+      <div id="chat-log" class="chat-log"></div>
     </div>
     <div class="hud-tr" id="hud-tr">
       <div class="tr-row">
         <div id="hud-room" class="room"></div>
+        <button id="act-chat" class="btn icon-btn chat-btn">Chat</button>
         <button id="act-menu" class="btn icon-btn" title="Menu" aria-label="Menu">&#9776;</button>
       </div>
       <div id="hud-players" class="plist"></div>
@@ -150,10 +155,6 @@
     <div class="hud-actions">
       <button id="act-ready" class="btn hidden">Ready (R)</button>
       <button id="act-shop" class="btn hidden">Shop (E)</button>
-      <button id="act-chat" class="btn">Chat</button>
-    </div>
-    <div class="chat">
-      <div id="chat-log" class="chat-log"></div>
     </div>
     <div id="chat-panel" class="chat-panel hidden">
       <div class="chat-head"><b>Chat</b><button class="btn tiny" id="chat-close">Close</button></div>
@@ -183,6 +184,7 @@
     <div class="panel">
       <h2>Wandering Merchant</h2>
       <p class="small">"Gold for power, traveller!" &mdash; You have <b id="shop-gold">0</b> gold.</p>
+      <p id="shop-timer" class="small shop-timer"></p>
       <div id="shop-list" class="shop-list"></div>
       <button class="btn" id="shop-close">Close</button>
     </div>

@@ -434,7 +434,7 @@ export class Game {
   layoutHud() {
     const tc = $('hud-tc');
     tc.style.top = '';
-    const r = tc.getBoundingClientRect();
+    const r = $('hud-tc-main').getBoundingClientRect(); // chat lines below may overlap freely
     let below = 0;
     for (const id of ['hud-tl', 'hud-tr']) {
       const o = $(id).getBoundingClientRect();
@@ -498,11 +498,16 @@ export class Game {
     $('menu-mute').textContent = m ? 'Unmute' : 'Mute';
   }
 
-  toggleShop(open) {
+  // Opening the shop pauses the game for everyone (the server keeps a time limit).
+  toggleShop(open, tellServer = true) {
     if (open && !this.nearMerchant()) return;
+    if (open === this.shopOpen) return;
+    if (open && this.myStats() && this.myStats().dead) return;
     this.shopOpen = open;
+    this.shopAt = performance.now();
     $('shop').classList.toggle('hidden', !open);
     this.lastShopKey = '';
+    if (tellServer) this.act('shop', open);
   }
 
   bindUi() {
@@ -608,6 +613,8 @@ export class Game {
     readyBtn.textContent = meReady ? 'Not Ready (R)' : 'Ready (R)';
     $('act-shop').classList.toggle('hidden', !this.nearMerchant());
     if (this.shopOpen && !this.nearMerchant()) this.toggleShop(false);
+    // The server closed our shop (time ran out)
+    if (this.shopOpen && !st.sh && performance.now() - this.shopAt > 1500) this.toggleShop(false, false);
 
     const boss = view.enemies.find((e) => e.boss);
     $('boss-bar').classList.toggle('hidden', !boss);
@@ -624,10 +631,10 @@ export class Game {
     // Level-up: the game is paused for everyone until every player has picked.
     const ch = st.ch || [];
     const pz = this.pauseInfo();
-    const key = JSON.stringify([ch, pz]);
+    const key = JSON.stringify([ch, pz, this.shopOpen]);
     if (key !== this.lastChoicesKey) {
       this.lastChoicesKey = key;
-      const show = ch.length > 0 || !!pz;
+      const show = ch.length > 0 || (!!pz && !this.shopOpen);
       $('choices').classList.toggle('hidden', !show);
       $('choices').classList.toggle('waiting', !ch.length);
       $('choices-title').textContent = ch.length ? 'LEVEL UP! Pick an upgrade' : 'PAUSED';
@@ -638,11 +645,17 @@ export class Game {
         </button>`).join('');
       let wait = '';
       if (pz) {
-        const others = pz.n.filter((n) => !(ch.length && n === this.profile.name));
-        if (!ch.length) wait = `Waiting for ${others.join(', ')} to pick an upgrade...`;
-        else if (others.length) wait = `The game is paused until everyone picks. Also waiting for: ${others.join(', ')}`;
+        const me = this.profile.name;
+        const pickers = pz.n.filter((n) => !(ch.length && n === me));
+        const shoppers = (pz.s || []).filter((n) => !(this.shopOpen && n === me));
+        const parts = [];
+        if (pickers.length) parts.push(`${pickers.join(', ')} to pick an upgrade`);
+        if (shoppers.length) parts.push(`${shoppers.join(', ')} to finish shopping`);
+        if (!ch.length) wait = `Waiting for ${parts.join(' and ')}...`;
+        else if (parts.length) wait = `The game is paused until everyone is done. Also waiting for ${parts.join(' and ')}.`;
         else wait = 'The game is paused until you pick.';
-        wait += ` (auto-pick in ${pz.t}s)`;
+        if (pz.n.length) wait += ` (auto-pick in ${pz.t}s)`;
+        else if (shoppers.length) wait += ` (shop closes in ${pz.st}s)`;
       }
       $('choices-wait').textContent = wait;
       if (show && this.chatOpen) this.toggleChat(false);
@@ -650,6 +663,7 @@ export class Game {
 
     // Shop
     if (this.shopOpen) {
+      $('shop-timer').textContent = st.sh ? `The game is paused while you shop (${st.sht}s left)` : '';
       const sk = JSON.stringify([st.g, st.pm]);
       if (sk !== this.lastShopKey) {
         this.lastShopKey = sk;
