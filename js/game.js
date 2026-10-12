@@ -344,6 +344,7 @@ export class Game {
     if (!wx && !wy) return;
     this.attackCd = slashCooldown((this.myStats().w || {}).sword);
     this.audio.sfx('slash');
+    this.renderer.markAttack(this.myId);
     this.act('attack', { x: Math.round(wx * 100) / 100, y: Math.round(wy * 100) / 100 });
   }
 

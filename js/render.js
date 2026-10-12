@@ -1,5 +1,6 @@
 // Draws the world in a top-down three-quarter view at a low resolution and
-// scales it up with crisp pixels.
+// scales it up with crisp pixels. The canvas itself is twice that resolution
+// (DETAIL), so heroes can be drawn with finer pixels than the scenery.
 import { TILE } from './util.js';
 import { MAP, O } from './world.js';
 import {
@@ -10,6 +11,8 @@ import { paintGround, sceneSprite, TALL } from './scenery.js';
 import { bladePositions, auraRadius, giantAngle, GIANT_LEN } from './sim.js';
 
 const BG = '#0c1a10';
+const DETAIL = 2;
+const ATTACK_POSE = 0.22; // seconds a hero shows the sword-strike pose
 
 export class Renderer {
   constructor(canvas) {
@@ -20,6 +23,8 @@ export class Renderer {
     this.fx = [];       // floating damage numbers, particles, lightning
     this.shake = 0;
     this.groundCache = null;
+    this.attackAt = new Map(); // player id -> when they last swung (performance.now)
+    this.trails = new Map();   // player id -> recent dash positions, for afterimages
     this.resize();
     addEventListener('resize', () => this.resize());
   }
@@ -29,8 +34,8 @@ export class Renderer {
     this.scale = s;
     this.w = Math.ceil(innerWidth / s);
     this.h = Math.ceil(innerHeight / s);
-    this.canvas.width = this.w;
-    this.canvas.height = this.h;
+    this.canvas.width = this.w * DETAIL;
+    this.canvas.height = this.h * DETAIL;
     this.canvas.style.width = this.w * s + 'px';
     this.canvas.style.height = this.h * s + 'px';
     this.g.imageSmoothingEnabled = false;
@@ -45,6 +50,9 @@ export class Renderer {
   sx(x) { return Math.round(x * TILE - this.cam.x + this.w / 2); }
   sy(x, y) { return Math.round(y * TILE - this.cam.y + this.h / 2); }
 
+  // A hero just swung their sword: show the strike pose for a moment.
+  markAttack(id) { this.attackAt.set(id, performance.now()); }
+
   addFx(f) { this.fx.push(f); if (this.fx.length > 300) this.fx.shift(); }
 
   event(e, players) {
@@ -55,7 +63,10 @@ export class Renderer {
         if (e.t === 'ogre') this.shake = 0.6;
         break;
       case 'zap': this.addFx({ t: 'zap', x: e.x, y: e.y, life: 0.25 }); break;
-      case 'slash': this.addFx({ t: 'slash', x: e.x, y: e.y, a: e.a, r: e.r || 1.6, life: 0.16 }); break;
+      case 'slash':
+        this.addFx({ t: 'slash', x: e.x, y: e.y, a: e.a, r: e.r || 1.6, life: 0.16 });
+        if (e.id) this.markAttack(e.id);
+        break;
       case 'hurt': {
         const p = players && players.find((pp) => pp.id === e.id);
         if (p) this.addFx({ t: 'flash', id: e.id, life: 0.2 });
@@ -67,6 +78,8 @@ export class Renderer {
 
   draw(view, dt) {
     const g = this.g;
+    g.setTransform(DETAIL, 0, 0, DETAIL, 0, 0);
+    g.imageSmoothingEnabled = false;
     const { world, players, enemies, projs, pickups, me, time } = view;
     this.buildGround(world);
 
@@ -230,8 +243,8 @@ export class Renderer {
     const g = this.g;
     const x = this.sx(it.x, it.y), y = this.sy(it.x, it.y);
     drawShadow(g, x, y, 8);
-    const s = charSprite(MERCHANT_LOOK, 0, 0);
-    g.drawImage(s.img, x - s.ox, y - s.oy + Math.round(Math.sin(time * 2)));
+    const s = charSprite(MERCHANT_LOOK, 0, Math.floor(time * 1.2) % 2, 'idle');
+    g.drawImage(s.img, x - s.ox, y - s.oy, s.w, s.h);
   }
 
   drawEnemy(e, time) {
@@ -265,19 +278,33 @@ export class Renderer {
       }
       // ghost of the player floating
       g.globalAlpha = 0.35;
-      const gs = charSprite(p.look, 0, 0);
-      g.drawImage(gs.img, x - gs.ox, y - gs.oy - 8 + Math.round(Math.sin(time * 3) * 2));
+      const gs = charSprite(p.look, 0, 0, 'idle');
+      g.drawImage(gs.img, x - gs.ox, y - gs.oy - 8 + Math.round(Math.sin(time * 3) * 2), gs.w, gs.h);
       g.globalAlpha = 1;
       return;
     }
-    drawShadow(g, x, y, 8);
-    const frame = p.mv ? Math.floor(time * 8) % 4 : 0;
-    const s = charSprite(p.look, p.dir, frame);
-    const flash = this.fx.some((f) => f.t === 'flash' && f.id === p.id);
-    if (p.dash) g.globalAlpha = 0.6;
-    if (flash && Math.floor(time * 30) % 2) g.globalAlpha = 0.3;
-    g.drawImage(s.img, x - s.ox, y - s.oy);
+    const now = performance.now();
+    // Pose: sword strike, walking, or breathing in place
+    let s;
+    if (now - (this.attackAt.get(p.id) || -1e9) < ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, 0, 'atk');
+    else if (p.mv || p.dash) s = charSprite(p.look, p.dir, Math.floor(now / 110) % 4);
+    else s = charSprite(p.look, p.dir, Math.floor(now / 700 + (p.id.charCodeAt(1) || 0)) % 2, 'idle');
+
+    // Dash: a trail of fading afterimages
+    let trail = this.trails.get(p.id);
+    if (!trail) this.trails.set(p.id, (trail = []));
+    if (p.dash) trail.push({ x: p.x, y: p.y, at: now });
+    while (trail.length && now - trail[0].at > 180) trail.shift();
+    for (const t of trail) {
+      g.globalAlpha = 0.35 * (1 - (now - t.at) / 180);
+      g.drawImage(s.img, this.sx(t.x, t.y) - s.ox, this.sy(t.x, t.y) - s.oy, s.w, s.h);
+    }
     g.globalAlpha = 1;
+
+    drawShadow(g, x, y, 9);
+    // Hit: flash red
+    const hurt = this.fx.some((f) => f.t === 'flash' && f.id === p.id) && Math.floor(now / 50) % 2 === 0;
+    g.drawImage(hurt ? s.hurt() : s.img, x - s.ox, y - s.oy, s.w, s.h);
   }
 
   drawNames(players, view) {

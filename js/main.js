@@ -130,8 +130,8 @@ function demoFrame(dt) {
   renderer.draw({ world: demoWorld, players: demoHeroes, enemies: [], projs: [], pickups: [], me: null, meId: null, time: demoT, phase: 'demo' }, dt);
   // Title hero preview
   const tc = $('title-hero').getContext('2d');
-  tc.clearRect(0, 0, 20, 30);
-  tc.drawImage(charSprite(profile.look, 0, Math.floor(demoT * 4) % 4).img, 0, 0);
+  tc.clearRect(0, 0, 40, 62);
+  tc.drawImage(charSprite(profile.look, 0, Math.floor(demoT * 1.5) % 2, 'idle').img, 0, 0);
 }
 let lastT = performance.now();
 (function menuLoop(now) {
@@ -201,10 +201,13 @@ $('char-done').addEventListener('click', () => {
     g.imageSmoothingEnabled = false;
     g.clearRect(0, 0, c.width, c.height);
     g.fillStyle = 'rgba(0,0,0,0.25)';
-    g.fillRect(20, 112, 40, 4);
-    const frame = Math.floor(performance.now() / 160) % 4;
-    const s = charSprite(draft.look, DIRS[previewDir], frame);
-    g.drawImage(s.img, 0, 0, 20, 30, 0, 0, 80, 120);
+    g.fillRect(18, 114, 44, 4);
+    // Show off the poses: walk, breathe, swing
+    const t = performance.now() % 3600;
+    const s = t < 1800 ? charSprite(draft.look, DIRS[previewDir], Math.floor(t / 110) % 4)
+      : t < 3000 ? charSprite(draft.look, DIRS[previewDir], Math.floor(t / 600) % 2, 'idle')
+        : charSprite(draft.look, DIRS[previewDir], 0, 'atk');
+    g.drawImage(s.img, 0, 0, s.img.width * 2, s.img.height * 2);
   }
   requestAnimationFrame(previewLoop);
 })();
