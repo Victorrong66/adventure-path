@@ -54,7 +54,7 @@ const TUNIC = {
 };
 
 // One frame, recoloured for `look` = { skin, hair, outfitColor (hex), outfit (name) }.
-// kind: 'front' | 'side' | 'back' (4 walking frames each), 'atk' (3), 'hurt', 'down'.
+// kind: 'front' | 'side' | 'back' (4 walking frames each), 'atk' (3), 'hurt', 'down', 'win'.
 // Returns { img, ox, oy } with the feet at (ox, oy).
 export function heroFrame(look, kind, index, flip) {
   const list = HERO_FRAMES[kind];

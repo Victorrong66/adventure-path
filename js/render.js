@@ -286,7 +286,9 @@ export class Renderer {
     const since = now - (this.attackAt.get(p.id) || -1e9);
     const hit = this.fx.some((f) => f.t === 'flash' && f.id === p.id);
     let bob = 0;
+    const cheer = this.fx.some((f) => f.t === 'lvl' && f.id === p.id);
     if (hit && since >= ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, 0, 'hurt');
+    else if (cheer && !p.mv && since >= ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, 0, 'win'); // level up!
     else if (since < ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, Math.min(2, Math.floor((since / (ATTACK_POSE * 1000)) * 3)), 'atk');
     else if (p.mv || p.dash) s = charSprite(p.look, p.dir, Math.floor(now / 110) % 4);
     else {

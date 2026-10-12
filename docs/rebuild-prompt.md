@@ -21,7 +21,7 @@ Build a browser game called **Victor's World**: a pixel-art, co-op monster-swarm
 
 ## Characters
 - Character creator with a live, rotatable, animated preview (walk, idle, sword swing): name (12 characters max), 6 skin tones, 8 anime-style hero haircuts with their own dark outline and highlight streaks (Hero, Swoop, Flame, Layered, Wild, Fluffy, Long, Slick), 8 hair colours, an Extra (None, Goggles, Headband, Cap, Beanie), 6 young-adventurer outfits (Adventurer with vest and scarf, Squire with tin armour and pot helmet, Apprentice mage with floppy star hat and robe, Ranger with hood and quiver, Dragonhide with a horned scaly hood, Royal with crown and fur collar) and 8 storybook outfit colours. Include a Random button.
-- Heroes come from a sprite sheet (tools/hero-sheet.png): tools/build-hero.py cuts out 4-frame walks facing front, side and back, a 3-frame sword swing, a hurt pose and a knocked-out pose, shrinks them to game size and marks cloak, hair, skin and tunic pixels in the alpha channel so js/hero.js can recolour them per player (cloak = outfit colour, tunic tinted by outfit type).
+- Heroes come from a sprite sheet (tools/hero-sheet.png): tools/build-hero.py cuts out 4-frame walks facing front, side and back, a 3-frame sword swing, a hurt pose, a knocked-out pose and a victory pose, shrinks them to game size and marks cloak, hair, skin and tunic pixels in the alpha channel so js/hero.js can recolour them per player (cloak = outfit colour, tunic tinted by outfit type).
 - The profile (name, look and a random player ID) is saved in localStorage.
 
 ## Multiplayer (peer-to-peer, no game server)

@@ -87,7 +87,7 @@ const charCache = new Map();
 
 // Heroes (see hero.js). Returns { img, ox, oy, w, h, hurt() }: draw img at
 // w x h at (footX - ox, footY - oy).
-// pose: 'walk' (frames 0..3), 'idle', 'atk' (0..2), 'hurt' or 'down'.
+// pose: 'walk' (frames 0..3), 'idle', 'atk' (0..2), 'hurt', 'down' or 'win'.
 export function charSprite(look, facing, frame = 0, pose = 'walk') {
   const key = `${look.skin}${look.hairColor}${look.outfit}${look.outfitColor}|${facing}|${pose}|${frame}`;
   let s = charCache.get(key);
@@ -102,9 +102,9 @@ export function charSprite(look, facing, frame = 0, pose = 'walk') {
     let kind = facing === 1 ? 'back' : facing === 0 ? 'front' : 'side';
     let index = frame;
     if (pose === 'idle') index = 0;
-    if (pose === 'atk' || pose === 'hurt' || pose === 'down') kind = pose;
+    if (pose === 'atk' || pose === 'hurt' || pose === 'down' || pose === 'win') kind = pose;
     // swings and falls face left or right; "up" swings go left, "down" swings go right
-    const flip = kind === 'atk' || kind === 'hurt' || kind === 'down' ? left || facing === 1 : left;
+    const flip = kind === 'atk' || kind === 'hurt' || kind === 'down' || kind === 'win' ? left || facing === 1 : left;
     const f = heroFrame(colors, kind, index, flip);
     let red = null;
     s = {
