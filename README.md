@@ -1,4 +1,4 @@
-# Victor's World
+# Ember Arena
 
 A pixel-art, top-down (three-quarter view) co-op monster-swarm game that runs in the browser.
 Make your hero, host a world, and have your friends join with a room code to fight
