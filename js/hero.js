@@ -235,7 +235,7 @@ export function buildHero(look, dir, pose, frame) {
   }
 
   // ------------------------------------------------------------------ hair
-  drawHair(style, front ? 'front' : back ? 'back' : 'side', R, P, hair, hairD, hairL, skin);
+  drawHair(style, front ? 'front' : back ? 'back' : 'side', R, P, hair, hairD, hairL);
 
   // ------------------------------------------------------------------ extras
   if (extra === 'Goggles') {
@@ -307,64 +307,57 @@ export function buildHero(look, dir, pose, frame) {
   }
 }
 
-// Hair. R/P paint in upper-body coordinates (head x6..13, face rows 5..10).
-function drawHair(style, view, R, P, H, D, Lt, skin) {
-  const front = view === 'front', back = view === 'back', side = view === 'side';
-  // the messy mop all styles start from
-  const mop = () => {
-    if (front) {
-      R(7, 1, 6, 1, H); R(6, 2, 8, 1, H); R(5, 3, 10, 2, H);
-      P(5, 5, H); R(6, 5, 2, 1, H); P(9, 5, H); R(12, 5, 2, 1, H); P(14, 5, D); P(5, 6, D); P(14, 6, D);
-      R(7, 2, 2, 1, Lt); P(6, 3, Lt); P(10, 3, D); P(12, 4, D); P(8, 4, D);
-    } else if (back) {
-      R(7, 1, 6, 1, H); R(6, 2, 8, 1, H); R(5, 3, 10, 7, H); R(13, 3, 2, 7, D);
-      R(7, 2, 2, 1, Lt); P(8, 5, D); P(11, 6, D); P(7, 8, D); for (let x = 5; x < 15; x += 2) P(x, 10, H);
-    } else {
-      R(8, 1, 5, 1, H); R(7, 2, 7, 1, H); R(6, 3, 9, 2, H); R(6, 5, 4, 4, H); P(6, 9, H); P(8, 9, D);
-      R(12, 5, 2, 1, H); P(14, 4, D); R(6, 5, 1, 4, D); R(9, 2, 2, 1, Lt); P(10, 4, D); P(7, 6, D);
-    }
-  };
-  const stubble = (x, y, w, h) => { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) P(x + i, y + j, (i + j) % 3 ? mix(skin, H, 0.3) : mix(skin, H, 0.5)); };
-  switch (style) {
-    case 'Messy': mop(); break;
-    case 'Spiky':
-      mop();
-      if (!side) { for (const x of [5, 8, 11, 14]) P(x, 2, H); for (const x of [6, 9, 12]) P(x, 0, H), P(x, 1, H); }
-      else { P(7, 1, H); P(6, 0, H); P(10, 0, H); P(10, 1, H); P(5, 3, H); P(4, 2, H); }
-      break;
-    case 'Long':
-      mop();
-      if (front) { R(4, 5, 2, 9, H); R(14, 5, 2, 9, D); P(4, 14, D); }
-      else if (back) { R(5, 10, 10, 4, H); R(13, 10, 2, 4, D); for (let x = 5; x < 15; x += 2) P(x, 14, H); }
-      else { R(6, 9, 4, 5, H); P(6, 14, H); R(6, 9, 1, 5, D); }
-      break;
-    case 'Braid':
-      mop();
-      if (front) for (let y = 7; y < 15; y++) R(14, y, 2, 1, y % 2 ? H : D);
-      else if (back) { for (let y = 10; y < 17; y++) R(9, y, 2, 1, y % 2 ? H : D); P(9, 17, '#c0402e'); P(10, 17, '#c0402e'); }
-      else for (let y = 8; y < 16; y++) R(5, y, 2, 1, y % 2 ? H : D);
-      break;
-    case 'Curls': {
-      const dots = (x0, y0, x1, y1) => { for (let y = y0; y <= y1; y++) for (let x = x0 + (y % 2); x <= x1; x += 2) P(x, y, (x + y) % 4 ? D : Lt); };
-      if (front) { R(5, 0, 10, 1, H); R(4, 1, 12, 4, H); R(4, 5, 2, 4, H); R(14, 5, 2, 4, H); P(6, 5, H); P(13, 5, H); dots(4, 1, 15, 4); }
-      else if (back) { R(5, 0, 10, 1, H); R(4, 1, 12, 10, H); dots(4, 1, 15, 10); }
-      else { R(6, 0, 8, 1, H); R(5, 1, 10, 4, H); R(5, 5, 5, 5, H); dots(5, 1, 14, 9); }
-      break;
-    }
-    case 'Ponytail':
-      mop();
-      if (back) { P(9, 9, '#e04878'); P(10, 9, '#e04878'); R(9, 10, 2, 6, H); P(10, 11, D); P(10, 13, D); }
-      else if (side) { P(6, 5, '#e04878'); R(4, 5, 2, 2, H); R(3, 7, 2, 5, H); P(3, 8, D); P(3, 10, D); }
-      else { R(15, 5, 1, 5, H); P(15, 7, D); }
-      break;
-    case 'Bun':
-      mop();
-      if (!side) { R(8, -1, 4, 2, H); P(8, -1, Lt); P(11, 0, D); } // sits above the head else { R(5, 1, 3, 3, H); P(5, 1, Lt); P(7, 3, D); }
-      break;
-    default: // Buzz
-      if (front) { R(6, 3, 8, 1, mix(skin, H, 0.4)); stubble(6, 4, 8, 1); }
-      else if (back) { R(6, 3, 8, 1, mix(skin, H, 0.4)); stubble(6, 4, 8, 6); }
-      else { R(8, 3, 6, 1, mix(skin, H, 0.4)); stubble(8, 4, 6, 1); stubble(8, 5, 1, 4); }
-      break;
-  }
+// Hair: adventurer haircuts drawn as small pixel templates for each view.
+// Template column i is frame x = 4 + i; the head is x6..13 (front/back) or
+// x8..13 (side, facing right), forehead row 5, eyes row 7.
+// H hair, D shade, L highlight, R red tie, T leather tie.
+const HAIR = {
+  Tousled: {
+    front: ['....H..H....', '...HHHHHH...', '..HLLHHHHD..', '.HLHHHDHHHD.', '.HHHDHHHDHD.', '.HH.HHD.HHD.', '.D..H....D..'],
+    back: ['....H..H....', '...HHHHHH...', '..HLHHHHHD..', '.HHHHHDHHHD.', '.HHDHHHHHHD.', '.HHHHHDHHHD.', '.HDHHHHHDHD.', '.HHHHHHHHHD.', '..HDHHDHHD..', '..H.H..H.D..'],
+    side: ['.....H..H...', '....HHHHHH..', '...HLLHHHHD.', '..HHHHHDHHH.', '..HHDHHHHHD.', '..HHHHD.HHD.', '..HDHH...D..', '..HHD.......', '..DH........', '...D........'],
+  },
+  Swept: {
+    front: ['............', '...HHHHH....', '..HLLHHHH...', '.HLHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHDD.', '.D...HHHD.D.'],
+    back: ['............', '...HHHHH....', '..HLHHHHH...', '.HLHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '..HHHHHHHD..'],
+    side: ['............', '....HHHHH...', '...HLLHHHH..', '..HHHHHHHHH.', '..HHHHHHHHD.', '..HHHHHHHH..', '..HHHD..HD..', '..HHD.......', '..DHD.......', '...D........'],
+  },
+  Short: {
+    front: ['............', '...HHHHHH...', '..HHLLHHHH..', '.HHHDLLHHHD.', '.HHHHHHHHHD.', '.D.HHHHH..D.'],
+    back: ['............', '...HHHHHH...', '..HHLHHHHH..', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '..DHHHHHHD..'],
+    side: ['............', '....HHHHHH..', '...HHLLHHHH.', '..HHHHHHHHD.', '..HHHHHHHHD.', '..HHH..HHH..', '..HHD.......', '..HD........', '...D........'],
+  },
+  Shoulder: {
+    front: ['............', '...HHHHHH...', '..HHLHHHHH..', '.HHLHHHHHHD.', '.HHHHDHHHHD.', 'HHHHH.HHHHDD', 'HH........DD', 'HH........DD', 'HH........DD', 'HH........DD', 'HH........DD', 'HD........DD', 'HD........DD', 'D..........D'],
+    back: ['............', '...HHHHHH...', '..HHLHHHHH..', '.HHLHHHHHHD.', 'HHHHHHHHHHDD', 'HHHHHDHHHHDD', 'HHHHHHHHHHDD', 'HHDHHHHHDHDD', 'HHHHHHHHHHDD', 'HHHHHDHHHHDD', 'HHHHHHHHHHDD', 'HHDHHHHHDHDD', 'HHHHHHHHHHDD', '.H.H.H.H.H.D'],
+    side: ['............', '....HHHHHH..', '...HHLLHHHH.', '..HHHHHHHHD.', '..HHHHHHHHD.', '.HHHHHHHHH..', '.HHHHD...D..', '.HHHD.......', '.HHHD.......', '.HHHD.......', '.HHHD.......', '.HHHD.......', '.HHD........', '..D.........'],
+  },
+  Braid: {
+    front: ['............', '...HHHHHH...', '..HHHLLHHH..', '.HHLHDHHHHD.', '.HHHHDHHHHD.', '.HH.....HHD.', '.D.......HHD', '..........HD', '..........DH', '..........HD', '..........DH', '..........HD', '..........DH', '..........RR', '..........HH'],
+    back: ['............', '...HHHHHH...', '..HHLHHHHH..', '.HHLHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '..HHHHHHHD..', '.....HD.....', '.....DH.....', '.....HD.....', '.....DH.....', '.....HD.....', '.....DH.....', '.....RR.....', '.....HH.....'],
+    side: ['............', '....HHHHHH..', '...HHLLHHHH.', '..HHHHHHHHD.', '..HHHHHHHHD.', '..HHHH..HH..', '..HHD.......', '.HDD........', '.DH.........', '.HD.........', '.DH.........', '.HD.........', '.DH.........', '.RR.........', '.HH.........'],
+  },
+  'Tied Back': {
+    front: ['............', '...HHHHHH...', '..HLLHHHHH..', '.HLHHHHHHHD.', '.HHHHHHHHHD.', '.HD......DD.', '.D........D.'],
+    back: ['............', '...HHHHHH...', '..HLLHHHHH..', '.HLHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '.HHHHHHHHHD.', '..HHHHHHHD..', '....HHHD....', '.....TT.....', '.....HD.....', '.....HD.....', '.....HD.....', '.....DD.....'],
+    side: ['............', '....HHHHHH..', '...HLLHHHHH.', '..HHHHHHHHD.', '..HHHHHHHHD.', '..HHHHD.HD..', '..HHHD......', '.TTHD.......', 'HHD.........', 'HD..........', 'HD..........', 'HD..........', 'D...........'],
+  },
+  Coils: {
+    front: ['...HHHHHH...', '..HLHDHLHH..', '.HLHDHHHDHH.', '.HDHHHLHHDH.', '.HHHDHHDHHD.', '.HDH.DH.HDD.'],
+    back: ['...HHHHHH...', '..HLHDHLHH..', '.HLHDHHHDHH.', '.HDHHHLHHDH.', '.HHHDHHDHHD.', '.HDHHHDHHDH.', '.HHDHHHHDHD.', '.HDHHDHHHDH.', '..HHDHHDHD..'],
+    side: ['....HHHHHH..', '...HLHDHLHH.', '..HLHDHHHDH.', '..HDHHHLHHD.', '..HHHDHHDHD.', '..HDHHD.HD..', '..HHDH......', '..DHD.......', '...D........'],
+  },
+  Crew: {
+    front: ['............', '............', '...HHHHHH...', '..HHLHHHHD..', '..HDHHDHHD..', '..D......D..'],
+    back: ['............', '............', '...HHHHHH...', '..HHLHHHHD..', '..HDHHDHHD..', '..HHHHHHHD..', '..HDHHDHHD..', '..HHHHHHHD..', '...DHHHHD...'],
+    side: ['............', '............', '....HHHHH...', '...HHLHHHD..', '...HDHHDHD..', '...HHHD.....', '...HDH......', '...DD.......'],
+  },
+};
+
+function drawHair(style, view, R, P, H, D, Lt) {
+  const t = (HAIR[style] || HAIR.Tousled)[view];
+  const col = { H, D, L: Lt, R: '#c0402e', T: '#4e3420' };
+  t.forEach((row, j) => {
+    for (let i = 0; i < row.length; i++) if (col[row[i]]) P(4 + i, j, col[row[i]]);
+  });
 }

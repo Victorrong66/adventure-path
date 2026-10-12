@@ -6,7 +6,7 @@ import { buildHero, HERO_W, HERO_H, HERO_FOOT } from './hero.js';
 export const SKINS = ['#ffdcb4', '#f0c08c', '#d8a070', '#b87848', '#8c5430', '#5c3418'];
 // Young adventurers off to fight monsters and dragons.
 // (Saved characters keep their numbers, so each list keeps its length.)
-export const HAIR_STYLES = ['Messy', 'Spiky', 'Long', 'Braid', 'Curls', 'Ponytail', 'Bun', 'Buzz'];
+export const HAIR_STYLES = ['Tousled', 'Swept', 'Short', 'Shoulder', 'Braid', 'Tied Back', 'Coils', 'Crew'];
 export const HAIR_COLORS = ['#2a2224', '#5a361e', '#8a5228', '#c4562a', '#e0b048', '#f0e0b0', '#4a78d0', '#e07aa8'];
 export const OUTFITS = ['Adventurer', 'Squire', 'Apprentice', 'Ranger', 'Dragonhide', 'Royal'];
 // Storybook colours: red, blue, green, gold, teal, purple, orange, cream
