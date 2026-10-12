@@ -131,7 +131,7 @@ function demoFrame(dt) {
   // Title hero preview
   const tc = $('title-hero').getContext('2d');
   tc.clearRect(0, 0, 56, 62);
-  tc.drawImage(charSprite(profile.look, 0, Math.floor(demoT * 1.5) % 2, 'idle').img, 0, 0);
+  tc.drawImage(charSprite(profile.look, 0, Math.floor(demoT * 3.8) % 4, 'idle').img, 0, 0);
 }
 let lastT = performance.now();
 (function menuLoop(now) {
@@ -206,7 +206,7 @@ $('char-done').addEventListener('click', () => {
     // Show off the poses: walk, breathe, swing
     const t = performance.now() % 3600;
     const s = t < 1800 ? charSprite(draft.look, DIRS[previewDir], Math.floor(t / 110) % 4)
-      : t < 3000 ? charSprite(draft.look, DIRS[previewDir], Math.floor(t / 600) % 2, 'idle')
+      : t < 3000 ? charSprite(draft.look, DIRS[previewDir], Math.floor(t / 260) % 4, 'idle')
         : charSprite(draft.look, DIRS[previewDir], Math.min(2, Math.floor((t - 3000) / 200)), 'atk');
     g.drawImage(s.img, 0, 0, s.img.width * 2, s.img.height * 2);
   }

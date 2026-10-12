@@ -243,7 +243,7 @@ export class Renderer {
     const g = this.g;
     const x = this.sx(it.x, it.y), y = this.sy(it.x, it.y);
     drawShadow(g, x, y, 8);
-    const s = charSprite(MERCHANT_LOOK, 0, Math.floor(time * 1.2) % 2, 'idle');
+    const s = charSprite(MERCHANT_LOOK, 0, Math.floor(time * 3.5) % 4, 'idle');
     g.drawImage(s.img, x - s.ox, y - s.oy, s.w, s.h);
   }
 
@@ -289,7 +289,7 @@ export class Renderer {
     const since = now - (this.attackAt.get(p.id) || -1e9);
     if (since < ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, Math.min(2, Math.floor((since / (ATTACK_POSE * 1000)) * 3)), 'atk');
     else if (p.mv || p.dash) s = charSprite(p.look, p.dir, Math.floor(now / 110) % 4);
-    else s = charSprite(p.look, p.dir, Math.floor(now / 700 + (p.id.charCodeAt(1) || 0)) % 2, 'idle');
+    else s = charSprite(p.look, p.dir, Math.floor(now / 260 + (p.id.charCodeAt(1) || 0)) % 4, 'idle');
 
     // Dash: a trail of fading afterimages
     let trail = this.trails.get(p.id);
