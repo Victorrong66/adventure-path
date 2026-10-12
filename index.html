@@ -22,7 +22,7 @@
         </button>
         <h1 class="logo">VICTOR'S<br>WORLD</h1>
         <p class="sub">A co-op monster swarm adventure</p>
-        <div class="title-hero"><canvas id="title-hero" width="40" height="62"></canvas></div>
+        <div class="title-hero"><canvas id="title-hero" width="56" height="62"></canvas></div>
         <p id="hello" class="small"></p>
         <div class="col">
           <button id="btn-host" class="btn big">Host a World</button>
@@ -38,7 +38,7 @@
         <h2>Create Your Hero</h2>
         <div class="creator">
           <div class="preview-wrap">
-            <canvas id="char-preview" width="80" height="124"></canvas>
+            <canvas id="char-preview" width="112" height="124"></canvas>
             <div class="row small-gap">
               <button class="btn tiny" id="rot-left">&#9664;</button>
               <button class="btn tiny" id="rot-right">&#9654;</button>
@@ -53,6 +53,9 @@
               <div class="cycler"><button class="btn tiny" data-cyc="hair" data-d="-1">&#9664;</button><b id="lbl-hair"></b><button class="btn tiny" data-cyc="hair" data-d="1">&#9654;</button></div>
             </div>
             <div class="opt" data-k="hairColor"><span>Hair Color</span><div class="swatches" id="sw-hairColor"></div></div>
+            <div class="opt" data-k="beard"><span>Beard</span>
+              <div class="cycler"><button class="btn tiny" data-cyc="beard" data-d="-1">&#9664;</button><b id="lbl-beard"></b><button class="btn tiny" data-cyc="beard" data-d="1">&#9654;</button></div>
+            </div>
             <div class="opt" data-k="outfit"><span>Outfit</span>
               <div class="cycler"><button class="btn tiny" data-cyc="outfit" data-d="-1">&#9664;</button><b id="lbl-outfit"></b><button class="btn tiny" data-cyc="outfit" data-d="1">&#9654;</button></div>
             </div>

@@ -4,12 +4,15 @@
 import { buildHero, HERO_W, HERO_H } from './hero.js';
 
 export const SKINS = ['#ffdcb4', '#f0c08c', '#d8a070', '#b87848', '#8c5430', '#5c3418'];
-export const HAIR_STYLES = ['Short', 'Spiky', 'Long', 'Ponytail', 'Afro', 'Mohawk', 'Bun', 'Bald'];
-export const HAIR_COLORS = ['#201818', '#6c3c1c', '#f0cc5c', '#c04818', '#e8e8f0', '#3c5ce0', '#e86cb0', '#3cac4c'];
-export const OUTFITS = ['Tunic', 'Knight', 'Wizard', 'Ninja', 'Hoodie', 'Overalls'];
-export const OUTFIT_COLORS = ['#d83c3c', '#3c64d8', '#3ca03c', '#8c3cc8', '#e8902c', '#2ca8a8', '#404050', '#e8e8e8'];
+// Viking-era looks. (Saved characters keep their numbers, so each list keeps its length.)
+export const HAIR_STYLES = ['Cropped', 'Shaggy', 'Long', 'Braid', 'Curls', 'Undercut', 'Topknot', 'Shaved'];
+export const HAIR_COLORS = ['#221c1a', '#4a2e1c', '#7a4a26', '#a84a22', '#c8963e', '#e0c890', '#8a8682', '#dcd8d0'];
+export const OUTFITS = ['Raider', 'Huscarl', 'Skald', 'Berserker', 'Jarl', 'Hunter'];
+// Dyed wool: madder red, woad blue, moss, ochre, undyed, charcoal, walnut, heather
+export const OUTFIT_COLORS = ['#8e2f25', '#3a5a86', '#4d6b35', '#b8862e', '#c9b99a', '#3d3a3a', '#6b4a2e', '#5e3f62'];
+export const BEARDS = ['None', 'Beard', 'Braided'];
 
-export const DEFAULT_LOOK = { skin: 1, hair: 0, hairColor: 1, outfit: 0, outfitColor: 1 };
+export const DEFAULT_LOOK = { skin: 1, hair: 0, hairColor: 1, outfit: 0, outfitColor: 1, beard: 0 };
 
 const OUTLINE = '#141018';
 
@@ -84,7 +87,7 @@ const charCache = new Map();
 // { img, ox, oy, w, h, hurt() }: draw img scaled to w x h (world pixels) at
 // (footX - ox, footY - oy). pose: 'walk' (frames 0..3), 'idle' (0..1) or 'atk'.
 export function charSprite(look, facing, frame = 0, pose = 'walk') {
-  const key = `${look.skin}${look.hair}${look.hairColor}${look.outfit}${look.outfitColor}|${facing}|${pose}|${frame}`;
+  const key = `${look.skin}${look.hair}${look.hairColor}${look.outfit}${look.outfitColor}${look.beard | 0}|${facing}|${pose}|${frame}`;
   let s = charCache.get(key);
   if (!s) {
     const dir = facing === 3 ? 2 : facing;
@@ -94,6 +97,7 @@ export function charSprite(look, facing, frame = 0, pose = 'walk') {
       outfitColor: OUTFIT_COLORS[look.outfitColor] || OUTFIT_COLORS[0],
       style: HAIR_STYLES[look.hair] || HAIR_STYLES[0],
       outfit: OUTFITS[look.outfit] || OUTFITS[0],
+      beard: BEARDS[look.beard | 0] || BEARDS[0],
     };
     let img = buildHero(colors, dir, pose, frame);
     if (facing === 3) img = flipped(img);
@@ -116,7 +120,7 @@ function tinted(src, color) {
   return c;
 }
 
-export const MERCHANT_LOOK = { skin: 2, hair: 2, hairColor: 4, outfit: 2, outfitColor: 3 };
+export const MERCHANT_LOOK = { skin: 2, hair: 2, hairColor: 7, outfit: 2, outfitColor: 7, beard: 2 };
 
 // ---------------------------------------------------------------- monsters
 

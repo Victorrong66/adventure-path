@@ -7,7 +7,7 @@ import { connectRoom, makeCode, normalizeCode } from './net.js';
 import { newWorldSave } from './sim.js';
 import { World } from './world.js';
 import {
-  SKINS, HAIR_STYLES, HAIR_COLORS, OUTFITS, OUTFIT_COLORS, charSprite,
+  SKINS, HAIR_STYLES, HAIR_COLORS, OUTFITS, OUTFIT_COLORS, BEARDS, charSprite,
   processFacePhoto, setMobFace, monsterSprite,
 } from './sprites.js';
 import {
@@ -114,7 +114,7 @@ $('set-mute').addEventListener('click', () => { audio.toggleMute(); refreshSetti
 
 const demoWorld = new World(12345);
 const demoHeroes = [0, 1, 2, 3].map((i) => ({
-  id: 'd' + i, name: '', look: { skin: (i * 2) % 6, hair: (i * 3) % 8, hairColor: (i * 5) % 8, outfit: i % 6, outfitColor: (i * 3 + 1) % 8 },
+  id: 'd' + i, name: '', look: { skin: (i * 2) % 6, hair: (i * 3) % 8, hairColor: (i * 5) % 8, outfit: i % 6, outfitColor: (i * 3 + 1) % 8, beard: i % 3 },
   x: demoWorld.cx + Math.cos(i * 1.6) * 3, y: demoWorld.cy + Math.sin(i * 1.6) * 3, dir: 0, mv: true, hp: 1, maxHp: 1, dead: false, au: 0, bl: i === 1 ? 2 : 0,
 }));
 let demoT = 0;
@@ -130,7 +130,7 @@ function demoFrame(dt) {
   renderer.draw({ world: demoWorld, players: demoHeroes, enemies: [], projs: [], pickups: [], me: null, meId: null, time: demoT, phase: 'demo' }, dt);
   // Title hero preview
   const tc = $('title-hero').getContext('2d');
-  tc.clearRect(0, 0, 40, 62);
+  tc.clearRect(0, 0, 56, 62);
   tc.drawImage(charSprite(profile.look, 0, Math.floor(demoT * 1.5) % 2, 'idle').img, 0, 0);
 }
 let lastT = performance.now();
@@ -165,6 +165,7 @@ function updateCreator() {
   for (const el of document.querySelectorAll('.swatch')) el.classList.toggle('on', draft.look[el.dataset.sw] === Number(el.dataset.i));
   $('lbl-hair').textContent = HAIR_STYLES[draft.look.hair];
   $('lbl-outfit').textContent = OUTFITS[draft.look.outfit];
+  $('lbl-beard').textContent = BEARDS[draft.look.beard | 0];
 }
 
 document.addEventListener('click', (e) => {
@@ -173,7 +174,7 @@ document.addEventListener('click', (e) => {
   const cyc = e.target.closest('[data-cyc]');
   if (cyc && draft) {
     const k = cyc.dataset.cyc;
-    const n = k === 'hair' ? HAIR_STYLES.length : OUTFITS.length;
+    const n = k === 'hair' ? HAIR_STYLES.length : k === 'beard' ? BEARDS.length : OUTFITS.length;
     draft.look[k] = (draft.look[k] + Number(cyc.dataset.d) + n) % n;
     updateCreator();
   }
@@ -182,7 +183,7 @@ $('rot-left').addEventListener('click', () => { previewDir = (previewDir + 3) % 
 $('rot-right').addEventListener('click', () => { previewDir = (previewDir + 1) % 4; });
 $('char-random').addEventListener('click', () => {
   const r = (n) => (Math.random() * n) | 0;
-  draft.look = { skin: r(SKINS.length), hair: r(HAIR_STYLES.length), hairColor: r(HAIR_COLORS.length), outfit: r(OUTFITS.length), outfitColor: r(OUTFIT_COLORS.length) };
+  draft.look = { skin: r(SKINS.length), hair: r(HAIR_STYLES.length), hairColor: r(HAIR_COLORS.length), outfit: r(OUTFITS.length), outfitColor: r(OUTFIT_COLORS.length), beard: r(BEARDS.length) };
   updateCreator();
 });
 $('char-done').addEventListener('click', () => {
@@ -201,12 +202,12 @@ $('char-done').addEventListener('click', () => {
     g.imageSmoothingEnabled = false;
     g.clearRect(0, 0, c.width, c.height);
     g.fillStyle = 'rgba(0,0,0,0.25)';
-    g.fillRect(18, 114, 44, 4);
+    g.fillRect(34, 114, 44, 4);
     // Show off the poses: walk, breathe, swing
     const t = performance.now() % 3600;
     const s = t < 1800 ? charSprite(draft.look, DIRS[previewDir], Math.floor(t / 110) % 4)
       : t < 3000 ? charSprite(draft.look, DIRS[previewDir], Math.floor(t / 600) % 2, 'idle')
-        : charSprite(draft.look, DIRS[previewDir], 0, 'atk');
+        : charSprite(draft.look, DIRS[previewDir], Math.min(2, Math.floor((t - 3000) / 200)), 'atk');
     g.drawImage(s.img, 0, 0, s.img.width * 2, s.img.height * 2);
   }
   requestAnimationFrame(previewLoop);

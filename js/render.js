@@ -12,7 +12,7 @@ import { bladePositions, auraRadius, giantAngle, GIANT_LEN } from './sim.js';
 
 const BG = '#0c1a10';
 const DETAIL = 2;
-const ATTACK_POSE = 0.22; // seconds a hero shows the sword-strike pose
+const ATTACK_POSE = 0.27; // seconds a sword swing lasts (wind-up, slash, follow-through)
 
 export class Renderer {
   constructor(canvas) {
@@ -286,7 +286,8 @@ export class Renderer {
     const now = performance.now();
     // Pose: sword strike, walking, or breathing in place
     let s;
-    if (now - (this.attackAt.get(p.id) || -1e9) < ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, 0, 'atk');
+    const since = now - (this.attackAt.get(p.id) || -1e9);
+    if (since < ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, Math.min(2, Math.floor((since / (ATTACK_POSE * 1000)) * 3)), 'atk');
     else if (p.mv || p.dash) s = charSprite(p.look, p.dir, Math.floor(now / 110) % 4);
     else s = charSprite(p.look, p.dir, Math.floor(now / 700 + (p.id.charCodeAt(1) || 0)) % 2, 'idle');
 

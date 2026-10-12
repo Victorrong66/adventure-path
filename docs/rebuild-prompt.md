@@ -20,7 +20,7 @@ Build a browser game called **Victor's World**: a pixel-art, co-op monster-swarm
 - Chiptune music and sound effects made with the Web Audio API (square, triangle and noise waves): a calm camp song, a battle song during waves, and sounds for shooting, hits, deaths, XP, coins, level-up, waves, the boss, a party wipe, dash and sword slash. Mute with M and in Settings.
 
 ## Characters
-- Character creator with a live, rotatable, walking preview: name (12 characters max), 6 skin tones, 8 hair styles (Short, Spiky, Long, Ponytail, Afro, Mohawk, Bun, Bald), 8 hair colors, 6 outfits (Tunic, Knight, Wizard with a pointy hat, Ninja with headband and mask, Hoodie, Overalls) and 8 outfit colors. Include a Random button.
+- Character creator with a live, rotatable, animated preview (walk, idle, sword swing): name (12 characters max), 6 skin tones, 8 Viking-era hair styles (Cropped, Shaggy, Long, Braid, Curls, Undercut, Topknot, Shaved), 8 natural hair colours, 3 beards (None, Beard, Braided), 6 Viking-era outfits (Raider with fur mantle, Huscarl with mail, spangenhelm and round shield, Skald with long trimmed tunic and pinned cloak, Berserker with bear pelt and woad paint, Jarl with fur collar and brooches, Hunter with hooded capelet and quiver) and 8 dyed-wool outfit colours. Include a Random button.
 - Heroes are drawn at twice the world resolution (a 40x62 canvas shown at 20x31 world pixels) with realistic proportions, shading and textures, with 4 facing directions, a 4-frame walk, a 2-frame idle breath and a sword-strike pose (down, up, right, and left as a mirror of right) and a 4-frame walk cycle.
 - The profile (name, look and a random player ID) is saved in localStorage.
 

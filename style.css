@@ -72,11 +72,11 @@ h2 { font-size: 16px; color: var(--gold); }
 .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }
 .panel.center .row { justify-content: center; }
 .row.small-gap { gap: 2px; justify-content: center; }
-.title-hero canvas { width: 60px; height: 93px; }
+.title-hero canvas { width: 84px; height: 93px; }
 
 .creator { display: flex; gap: 20px; flex-wrap: wrap; }
 .preview-wrap { display: flex; flex-direction: column; align-items: center; background: #2c5c2c; padding: 12px; box-shadow: 0 0 0 3px var(--edge); flex: 0 0 auto; align-self: flex-start; }
-#char-preview { width: 160px; height: 248px; }
+#char-preview { width: 200px; height: 221px; }
 .options { flex: 1 1 260px; display: flex; flex-direction: column; gap: 12px; }
 .field { display: flex; flex-direction: column; font-size: 10px; color: var(--muted); }
 .opt > span { display: block; font-size: 10px; color: var(--muted); margin-bottom: 6px; }
