@@ -76,175 +76,278 @@ function fromTemplate(rows, pal, margin = 1, doOutline = true) {
 
 // ---------------------------------------------------------------- characters
 
-// Hair templates: 10 columns starting at sprite x=1. The head covers cols 2..7, rows 2..7.
-const HAIR = {
-  Short: {
-    down: ['', '...HHHH...', '..HHHHHH..', '..HHhHHH..', '..H....H..'],
-    up: ['', '...HHHH...', '..HHHHHH..', '..HHHHHH..', '..HHHHHH..', '..HHHHHH..', '..hHHHHh..'],
-    side: ['', '...HHHH...', '..HHHHHH..', '..HHHHH...', '..HHH.....', '..hH......'],
-  },
-  Spiky: {
-    down: ['..H.H.H.H.', '..HHHHHHH.', '.HHHHHHHH.', '..HHhHhH..', '..H....H..'],
-    up: ['..H.H.H.H.', '..HHHHHHH.', '.HHHHHHHH.', '..HHHHHH..', '..HHHHHH..', '..HHHHHH..', '..hHHHHh..'],
-    side: ['.H.H.H....', '.HHHHHHH..', 'HHHHHHHHH.', '.HHHHH....', '..HHH.....', '..hH......'],
-  },
-  Long: {
-    down: ['', '...HHHH...', '..HHHHHH..', '.HHHhHHHH.', '.HH....HH.', '.HH....HH.', '.HH....HH.', '.Hh....hH.', '.Hh....hH.', '.h......h.'],
-    up: ['', '...HHHH...', '..HHHHHH..', '.HHHHHHHH.', '.HHHHHHHH.', '.HHHHHHHH.', '.HHHHHHHH.', '.HHHHHHHH.', '.hHHHHHHh.', '..hhhhhh..'],
-    side: ['', '...HHHH...', '..HHHHHH..', '.HHHHHHH..', '.HHHH.....', '.HHHH.....', '.HHH......', '.HHH......', '.hHh......', '.hh.......'],
-  },
-  Ponytail: {
-    down: ['', '...HHHH...', '..HHHHHH..', '..HHhHHHH.', '..H....HH.', '........H.', '........h.'],
-    up: ['', '...HHHH...', '..HHHHHH..', '..HHHHHH..', '..HHhHHH..', '..HHHHHH..', '..hHHHHh..', '....HH....', '....HH....', '....hh....'],
-    side: ['', '...HHHH...', '..HHHHHH..', '.HHHHHH...', 'HHHHH.....', 'HH.HH.....', 'Hh.h......', 'h.........'],
-  },
-  Afro: {
-    down: ['..HHHHHH..', '.HHHHHHHH.', 'HHHHHHHHHH', 'HHHhHHhHHH', 'HHh....hHH', '.Hh....hH.', '..h....h..'],
-    up: ['..HHHHHH..', '.HHHHHHHH.', 'HHHHHHHHHH', 'HHHHHHHHHH', 'HHHHHHHHHH', '.HHHHHHHH.', '..hHHHHh..', '...hhhh...'],
-    side: ['..HHHHHH..', '.HHHHHHHH.', 'HHHHHHHHHH', 'HHHHHHHHH.', 'HHHHH.....', '.HHHh.....', '..hh......'],
-  },
-  Mohawk: {
-    down: ['....HH....', '....HH....', '...hHHh...'],
-    up: ['....HH....', '....HH....', '....HH....', '....HH....', '....hh....'],
-    side: ['...HHHH...', '..HHHHH...', '..hHHh....'],
-  },
-  Bun: {
-    down: ['....HH....', '...HhhH...', '..HHHHHH..', '..HHhHHH..', '..H....H..'],
-    up: ['....HH....', '...HhhH...', '..HHHHHH..', '..HHHHHH..', '..HHHHHH..', '..HHHHHH..', '..hHHHHh..'],
-    side: ['.HH.......', 'HhhHHH....', '.HHHHHHH..', '..HHHHHH..', '..HHH.....', '..hH......'],
-  },
-  Bald: { down: [], up: [], side: [] },
-};
+// Characters are drawn on a 20x30 canvas (feet at the bottom, room for hats and
+// spiky hair on top). Front-facing layout: head x5..14 y6..14, torso y15..21,
+// legs y22..26, boots y27..28. Side view faces right; left is a mirror image.
+const CW = 20, CH = 30;
+const EYE = '#2a1e34';
 
-const WIZ_HAT = {
-  front: ['......H...', '.....HH...', '....HHH...', '...HHYHH..', '.hhhhhhhh.'],
-  side: ['..H.......', '..HH......', '...HHH....', '..HHHYH...', '.hhhhhhhh.'],
-};
+function mix(a, b, t) {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const ch = (n, s) => (n >> s) & 255;
+  const m = (s) => Math.round(ch(pa, s) + (ch(pb, s) - ch(pa, s)) * t);
+  return '#' + ((1 << 24) | (m(16) << 16) | (m(8) << 8) | m(0)).toString(16).slice(1);
+}
+
+// Hair for each style and view. H = hair, D = dark, L = highlight.
+// Each function gets the pixel helpers and paints over the head.
+function drawHair(style, view, r, p, H, D, L) {
+  const capFront = () => {
+    r(7, 5, 6, 1, H); r(6, 6, 8, 1, H); r(5, 7, 10, 2, H);
+    r(5, 9, 1, 2, H); r(14, 9, 1, 2, D);
+    r(6, 8, 8, 1, D); p(6, 9, D); p(13, 9, D); // fringe shadow
+    r(7, 6, 2, 1, L); p(6, 7, L);
+  };
+  const capBack = (bottom = 13) => {
+    r(7, 5, 6, 1, H); r(6, 6, 8, 1, H); r(5, 7, 10, bottom - 6, H);
+    r(5, bottom, 10, 1, D); r(14, 7, 1, bottom - 6, D);
+    r(7, 6, 2, 1, L); p(6, 7, L);
+  };
+  const capSide = (bottom = 12) => {
+    r(8, 5, 5, 1, H); r(7, 6, 7, 1, H); r(6, 7, 9, 2, H);
+    r(6, 9, 4, bottom - 8, H); r(6, bottom, 4, 1, D); p(13, 9, H); p(14, 9, D);
+    r(10, 8, 4, 1, D); r(8, 6, 2, 1, L);
+  };
+  const front = view === 'front', back = view === 'back';
+  switch (style) {
+    case 'Short':
+      if (front) capFront(); else if (back) capBack(); else capSide();
+      break;
+    case 'Spiky':
+      if (front) { capFront(); for (const x of [5, 8, 11, 14]) { r(x, 3, 1, 2, H); p(x + (x < 14 ? 1 : -1), 4, H); } r(5, 4, 10, 1, H); p(8, 3, L); }
+      else if (back) { capBack(); for (const x of [5, 8, 11, 14]) r(x, 3, 1, 2, H); r(5, 4, 10, 1, H); }
+      else { capSide(); for (const x of [6, 9, 12]) { r(x, 3, 1, 2, H); p(x - 1, 3, H); } r(6, 4, 8, 1, H); p(4, 5, H); p(5, 6, H); }
+      break;
+    case 'Long':
+      if (front) { capFront(); r(4, 8, 2, 11, H); r(14, 8, 2, 11, H); r(4, 8, 1, 11, D); r(15, 8, 1, 11, D); r(5, 18, 1, 1, D); r(14, 18, 1, 1, D); }
+      else if (back) { capBack(18); r(4, 8, 1, 11, D); r(15, 8, 1, 11, D); r(7, 9, 1, 8, D); r(12, 9, 1, 8, D); }
+      else { capSide(18); r(5, 8, 1, 10, H); r(5, 9, 1, 9, D); r(8, 10, 1, 7, D); }
+      break;
+    case 'Ponytail':
+      if (front) { capFront(); r(15, 9, 2, 6, H); r(16, 10, 1, 6, D); p(15, 15, D); p(15, 8, '#f04878'); }
+      else if (back) { capBack(); r(9, 11, 2, 1, '#f04878'); r(9, 12, 2, 7, H); r(10, 12, 1, 7, D); p(9, 19, D); }
+      else { capSide(); p(6, 9, '#f04878'); r(3, 9, 3, 2, H); r(3, 11, 2, 4, H); r(3, 12, 1, 3, D); p(4, 15, D); }
+      break;
+    case 'Afro': {
+      const blob = (x0, x1, y0, y1) => { r(x0 + 3, y0, x1 - x0 - 5, 1, H); r(x0 + 1, y0 + 1, x1 - x0 - 1, 1, H); r(x0, y0 + 2, x1 - x0 + 1, y1 - y0 - 3, H); r(x0 + 1, y1 - 1, x1 - x0 - 1, 1, H); r(x0 + 3, y1, x1 - x0 - 5, 1, D); };
+      if (front) {
+        blob(3, 16, 2, 9); r(3, 9, 3, 4, H); r(14, 9, 3, 4, H); r(16, 4, 1, 8, D); r(4, 12, 2, 1, D); r(14, 12, 2, 1, D);
+        r(6, 9, 8, 1, D); r(6, 3, 3, 1, L); p(5, 4, L); p(10, 5, D); p(13, 6, D); p(7, 7, D);
+      } else if (back) { blob(3, 16, 2, 14); r(16, 4, 1, 9, D); r(6, 3, 3, 1, L); p(8, 8, D); p(12, 10, D); p(6, 12, D); }
+      else { blob(4, 15, 2, 9); r(4, 9, 6, 4, H); r(5, 13, 4, 1, D); r(10, 9, 5, 1, D); r(6, 3, 3, 1, L); p(8, 6, D); p(12, 5, D); }
+      break;
+    }
+    case 'Mohawk':
+      if (front) { r(9, 2, 2, 7, H); p(10, 2, D); r(10, 3, 1, 6, D); p(9, 2, L); r(6, 7, 3, 1, D); r(11, 7, 3, 1, D); }
+      else if (back) { r(9, 2, 2, 12, H); r(10, 3, 1, 11, D); r(6, 8, 3, 1, D); r(11, 8, 3, 1, D); }
+      else { r(8, 3, 4, 1, H); r(6, 4, 7, 3, H); r(6, 6, 7, 1, D); p(5, 5, H); r(8, 4, 2, 1, L); r(7, 7, 4, 2, D); }
+      break;
+    case 'Bun':
+      if (front) { capFront(); r(9, 2, 2, 1, H); r(8, 3, 4, 2, H); r(10, 3, 2, 2, D); p(8, 3, L); }
+      else if (back) { capBack(); r(8, 2, 4, 1, H); r(7, 3, 6, 3, H); r(11, 3, 2, 3, D); r(7, 5, 6, 1, D); p(8, 3, L); }
+      else { capSide(); r(4, 4, 2, 1, H); r(3, 5, 4, 3, H); r(3, 7, 4, 1, D); p(4, 5, L); }
+      break;
+    default: // Bald: a little shine
+      break;
+  }
+}
 
 // Build one frame of a character. dir: 0 down, 1 up, 2 side (facing right). frame 0..3.
 function buildChar(look, dir, frame) {
-  const W = 14, H = 21;
-  const { c, g } = mk(W, H);
-  const OY = 2; // leave room for hats
-  const p = (x, y, col) => { g.fillStyle = col; g.fillRect(x + 1, y + OY, 1, 1); };
-  const r = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x + 1, y + OY, w, h); };
+  const { c, g } = mk(CW, CH);
+  const r = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+  const p = (x, y, col) => r(x, y, 1, 1, col);
+  const clear = (x, y) => g.clearRect(x, y, 1, 1);
 
   const skin = SKINS[look.skin] || SKINS[0];
-  const skinD = shade(skin, -0.15);
+  const skinD = shade(skin, -0.18);
+  const skinL = shade(skin, 0.25);
+  const blush = mix(skin, '#ff5c6c', 0.35);
   const hair = HAIR_COLORS[look.hairColor] || HAIR_COLORS[0];
-  const hairD = shade(hair, -0.3);
+  const hairD = shade(hair, -0.32);
+  const hairL = shade(hair, 0.3);
   const out = OUTFIT_COLORS[look.outfitColor] || OUTFIT_COLORS[0];
   const outD = shade(out, -0.3);
+  const outL = shade(out, 0.25);
   const outfit = OUTFITS[look.outfit] || OUTFITS[0];
   const style = HAIR_STYLES[look.hair] || HAIR_STYLES[0];
+  const GOLD = '#f0c848', GOLD_D = '#b08020';
 
-  let torso = out, torsoD = outD, sleeve = out, pants = '#5a4030', boots = '#2c1c12', accent = '#3a2818';
+  // Colors for each outfit: torso, sleeves, pants, boots, belt
+  let torso = out, torsoD = outD, torsoL = outL, sleeve = out, sleeveD = outD, pants = '#6a4a34', boots = '#3a2618', belt = '#5a3a22';
+  let shortSleeves = false;
   switch (outfit) {
-    case 'Knight': torso = '#b8bcc8'; torsoD = '#7c8090'; sleeve = '#a0a4b0'; pants = '#8c90a0'; boots = '#4c5060'; accent = out; break;
-    case 'Wizard': pants = out; boots = '#3a2a4a'; accent = '#f0d040'; break;
-    case 'Ninja': torso = '#2c2c3c'; torsoD = '#1a1a26'; sleeve = '#2c2c3c'; pants = '#2c2c3c'; boots = '#1a1a26'; accent = out; break;
-    case 'Hoodie': pants = '#3c5a9c'; boots = '#e8e8e8'; accent = outD; break;
-    case 'Overalls': torso = '#f0f0e8'; torsoD = '#c8c8c0'; sleeve = '#f0f0e8'; pants = out; boots = '#6b4423'; accent = out; break;
+    case 'Tunic': shortSleeves = true; break;
+    case 'Knight': torso = '#b8bcc8'; torsoD = '#7c8090'; torsoL = '#e4e8f0'; sleeve = '#a0a4b0'; sleeveD = '#7c8090'; pants = '#8c90a0'; boots = '#4c5060'; belt = '#5a3a22'; break;
+    case 'Wizard': pants = outD; boots = '#3a2a4a'; belt = GOLD; break;
+    case 'Ninja': torso = '#2c2c3c'; torsoD = '#1a1a26'; torsoL = '#40405a'; sleeve = '#2c2c3c'; sleeveD = '#1a1a26'; pants = '#2c2c3c'; boots = '#1a1a26'; belt = out; break;
+    case 'Hoodie': pants = '#3c5a9c'; boots = '#e8e8f0'; belt = null; break;
+    case 'Overalls': torso = '#f0f0e8'; torsoD = '#c8c8c0'; torsoL = '#ffffff'; sleeve = '#f0f0e8'; sleeveD = '#c8c8c0'; pants = out; boots = '#6b4423'; belt = null; break;
   }
+  const pantsD = shade(pants, -0.25);
+  const bootsL = shade(boots, 0.3);
 
-  const lift = frame === 1 ? 1 : frame === 3 ? 2 : 0;
-  const side = dir === 2;
+  const step = frame === 1 ? 1 : frame === 3 ? 2 : 0; // which leg is lifted
+  const side = dir === 2, front = dir === 0, back = dir === 1;
+  const view = front ? 'front' : back ? 'back' : 'side';
 
-  // Legs
+  // ---------------------------------------------------------------- behind the body
+  if (outfit === 'Hoodie' && front) { r(4, 6, 12, 9, outD); clear(4, 6); clear(15, 6); }
+  if (outfit === 'Hoodie' && back) { r(4, 6, 12, 10, out); }
+
+  // ---------------------------------------------------------------- legs
+  const leg = (x, y, w, col, colD, bootCol, bootColL, toe = 0) => {
+    r(x, y, w, 27 - y - (y > 22 ? 0 : 0), col);
+    r(x + w - 1, y, 1, 27 - y, colD);
+    r(x, 27, w + toe, 2, bootCol); r(x, 27, w, 1, bootColL);
+  };
   if (!side) {
-    const lY = lift === 1 ? -1 : 0, rY = lift === 2 ? -1 : 0;
-    r(4, 13 + lY, 2, 3, pants); r(4, 16 + lY, 2, 1, boots);
-    r(6, 13 + rY, 2, 3, pants); r(6, 16 + rY, 2, 1, boots);
-  } else if (lift) {
-    r(3, 13, 2, 3, pants); r(2, 16, 3, 1, boots);
-    r(7, 13, 2, 3, shade(pants, -0.15)); r(7, 16, 3, 1, boots);
+    const lY = step === 1 ? 1 : 0, rY = step === 2 ? 1 : 0;
+    r(9, 22, 2, 1, pantsD);
+    // lifted leg: shorter, boot drawn one pixel higher
+    g.save(); g.translate(0, -lY); leg(6, 22 + lY, 3, pants, pantsD, boots, bootsL); g.restore();
+    g.save(); g.translate(0, -rY); leg(11, 22 + rY, 3, pants, pantsD, boots, bootsL); g.restore();
+  } else if (step) {
+    leg(6, 22, 3, pantsD, shade(pantsD, -0.2), shade(boots, -0.2), boots, 1);
+    leg(10, 22, 3, pants, pantsD, boots, bootsL, 1);
   } else {
-    r(5, 13, 2, 3, pants); r(5, 16, 3, 1, boots);
+    leg(8, 22, 3, pants, pantsD, boots, bootsL, 1);
   }
 
-  // Hood sits behind the head when seen from the front
-  if (outfit === 'Hoodie' && dir === 0) r(2, 3, 8, 5, outD);
-
-  // Torso
-  r(3, 8, 6, 5, torso);
-  r(3, 12, 6, 1, torsoD);
-
-  // Arms
+  // ---------------------------------------------------------------- arms (behind / beside the torso)
+  const hand = (x, y) => { r(x, y, 2, 2, skin); p(x + 1, y + 1, skinD); };
   if (!side) {
-    const swing = lift === 1 ? 1 : lift === 2 ? -1 : 0;
-    r(2, 8, 1, 3 + Math.max(0, swing), sleeve); p(2, 11 + Math.max(0, swing), skin);
-    r(9, 8, 1, 3 + Math.max(0, -swing), sleeve); p(9, 11 + Math.max(0, -swing), skin);
+    const swing = step === 1 ? 1 : step === 2 ? -1 : 0;
+    for (const [x, d] of [[3, swing], [15, -swing]]) {
+      const len = 4 + Math.max(0, d);
+      if (shortSleeves) { r(x, 16, 2, 2, sleeve); r(x, 18, 2, len - 2, skin); r(x + 1, 18, 1, len - 2, skinD); }
+      else { r(x, 16, 2, len, sleeve); r(x + (x < 10 ? 0 : 1), 16, 1, len, sleeveD); }
+      hand(x, 16 + len);
+    }
+  } else {
+    // back arm peeks out behind the body when swinging
+    if (step) { const bx = step === 1 ? 6 : 12; r(bx, 16, 2, 3, sleeveD); r(bx, 19, 2, 2, skinD); }
   }
 
-  // Head
-  r(3, 2, 6, 6, skin);
-  r(3, 7, 6, 1, skinD);
-  if (dir === 0) { p(4, 5, '#201828'); p(7, 5, '#201828'); p(5, 6, skinD); p(6, 6, skinD); }
-  if (side) { p(7, 5, '#201828'); p(8, 6, skinD); }
+  // ---------------------------------------------------------------- torso
+  if (!side) {
+    r(5, 15, 10, 7, torso);
+    clear(5, 15); clear(14, 15);
+    r(13, 16, 2, 6, torsoD); r(6, 16, 1, 5, torsoL); r(5, 21, 10, 1, torsoD);
+  } else {
+    r(7, 15, 6, 7, torso);
+    r(7, 16, 1, 6, torsoD); r(11, 16, 1, 5, torsoL); r(7, 21, 6, 1, torsoD);
+  }
+  if (belt) {
+    if (!side) { r(5, 20, 10, 1, belt); r(9, 20, 2, 1, outfit === 'Wizard' ? GOLD_D : GOLD); }
+    else { r(7, 20, 6, 1, belt); p(12, 20, GOLD); }
+  }
 
-  // Outfit details
+  // ---------------------------------------------------------------- head
+  const HX = side ? 6 : 5, HW = side ? 9 : 10;
+  r(HX, 6, HW, 9, skin);
+  clear(HX, 6); clear(HX + HW - 1, 6); clear(HX, 14); clear(HX + HW - 1, 14);
+  r(HX + 1, 14, HW - 2, 1, skinD);
+  if (!side) {
+    r(14, 7, 1, 7, skinD);
+    // ears
+    r(4, 10, 1, 2, skin); p(4, 11, skinD); r(15, 10, 1, 2, skinD);
+  }
+  // neck
+  if (!side) r(8, 15, 4, 1, skinD); else r(9, 15, 3, 1, skinD);
+
+  if (front) {
+    // eyes with a shine, brows, blush, mouth
+    r(7, 10, 2, 2, EYE); p(7, 10, '#ffffff');
+    r(11, 10, 2, 2, EYE); p(11, 10, '#ffffff');
+    const brow = style === 'Bald' ? shade(skin, -0.4) : hairD;
+    r(7, 9, 2, 1, brow); r(11, 9, 2, 1, brow);
+    p(6, 12, blush); p(13, 12, blush);
+    p(10, 12, skinD);
+    r(9, 13, 2, 1, mix(skinD, '#802838', 0.45));
+  } else if (side) {
+    r(12, 10, 2, 2, EYE); p(13, 10, '#ffffff');
+    r(12, 9, 2, 1, style === 'Bald' ? shade(skin, -0.4) : hairD);
+    p(15, 11, skin); p(15, 12, skinD); // nose
+    p(12, 12, blush);
+    p(14, 13, mix(skinD, '#802838', 0.45));
+    r(8, 10, 2, 2, skinD); p(8, 10, skin); // ear
+  }
+  if (style === 'Bald') { r(7, 7, 2, 1, skinL); p(6, 8, skinL); }
+
+  // ---------------------------------------------------------------- outfit details
   switch (outfit) {
     case 'Tunic':
-      r(3, 11, 6, 1, accent);
-      if (dir === 0) { p(5, 8, skin); p(6, 8, skin); }
+      if (front) { r(8, 15, 4, 1, skin); r(9, 16, 2, 1, skin); p(8, 15, skinD); }
+      r(side ? 7 : 5, 21, side ? 6 : 10, 1, outD);
       break;
     case 'Knight':
-      if (!side) { r(5, 8, 2, 5, out); p(2, 8, torsoD); p(9, 8, torsoD); } else r(5, 8, 3, 5, out);
+      if (!side) {
+        r(8, 15, 4, 7, out); r(11, 15, 1, 7, outD); r(9, 17, 2, 2, GOLD); p(10, 18, GOLD_D);
+        r(3, 15, 3, 2, torsoL); r(14, 15, 3, 2, torsoD); p(3, 16, torsoD);
+      } else {
+        r(10, 15, 3, 7, out); r(12, 15, 1, 7, outD); p(11, 17, GOLD);
+        r(8, 15, 3, 2, torsoL);
+      }
       break;
     case 'Wizard':
-      r(3, 8, 6, 8, out); r(3, 15, 6, 1, outD); r(3, 11, 6, 1, accent);
-      if (!side) { r(4, 16 + (lift === 1 ? -1 : 0), 2, 1, boots); r(6, 16 + (lift === 2 ? -1 : 0), 2, 1, boots); }
-      else r(5, 16, 3, 1, boots);
+      // long robe over the legs
+      if (!side) {
+        r(5, 15, 10, 12, out); clear(5, 15); clear(14, 15);
+        r(4, 23, 12, 4, out); r(13, 16, 2, 10, outD); r(15, 23, 1, 4, outD); r(6, 16, 1, 9, outL);
+        r(4, 26, 12, 1, GOLD); r(5, 20, 10, 1, GOLD); r(9, 20, 2, 1, GOLD_D);
+        if (front) { r(9, 15, 2, 1, skin); r(9, 21, 2, 5, outD); }
+      } else {
+        r(7, 15, 6, 12, out); r(6, 23, 8, 4, out); r(7, 16, 1, 10, outD); r(6, 23, 1, 4, outD);
+        r(6, 26, 8, 1, GOLD); r(7, 20, 6, 1, GOLD);
+      }
       break;
     case 'Ninja':
-      r(3, 11, 6, 1, out);
-      if (dir === 0) r(3, 6, 6, 2, '#2c2c3c');
-      if (side) r(5, 6, 4, 2, '#2c2c3c');
+      if (front) { r(5, 12, 10, 3, '#2c2c3c'); clear(5, 14); clear(14, 14); r(14, 12, 1, 2, '#1a1a26'); }
+      if (side) { r(10, 12, 5, 3, '#2c2c3c'); p(15, 12, '#2c2c3c'); }
+      if (!side) { r(5, 21, 10, 1, '#1a1a26'); }
       break;
     case 'Hoodie':
-      r(4, 11, 4, 1, torsoD);
-      if (dir === 0) { p(5, 9, '#f0f0f0'); p(6, 9, '#f0f0f0'); }
+      if (front) { r(7, 18, 6, 2, outD); r(8, 16, 1, 2, '#f0f0f0'); r(11, 16, 1, 2, '#f0f0f0'); r(5, 21, 10, 1, outD); }
+      if (back) { r(5, 21, 10, 1, outD); }
+      if (side) { r(9, 18, 4, 2, outD); r(7, 21, 6, 1, outD); }
       break;
     case 'Overalls':
-      if (!side) { r(4, 9, 4, 4, out); p(4, 8, out); p(7, 8, out); if (dir === 0) { p(4, 9, '#f0d040'); p(7, 9, '#f0d040'); } }
-      else r(4, 9, 5, 4, out);
+      if (!side) {
+        r(7, 17, 6, 5, out); r(12, 17, 1, 5, outD); r(7, 15, 1, 2, out); r(12, 15, 1, 2, out);
+        if (front) { p(7, 17, GOLD); p(12, 17, GOLD); r(9, 18, 2, 1, outD); }
+      } else { r(9, 17, 4, 5, out); r(10, 15, 1, 2, out); p(10, 17, GOLD); }
       break;
   }
 
-  // Side arm in front of the torso
-  if (side) {
-    const hx = lift === 1 ? 7 : lift === 2 ? 4 : 5;
-    r(5, 8, 2, 3, outfit === 'Wizard' ? outD : shade(sleeve, -0.1));
-    r(hx, 11, 2, 1, skin);
+  // ---------------------------------------------------------------- hair & hats
+  drawHair(style, view, r, p, hair, hairD, hairL);
+
+  if (outfit === 'Hoodie') {
+    if (front) { r(5, 5, 10, 3, out); r(4, 7, 1, 7, out); r(15, 7, 1, 7, outD); r(5, 5, 1, 1, outL); clear(4, 6); clear(15, 6); r(6, 7, 8, 1, outD); }
+    if (back) { r(5, 5, 10, 10, out); r(14, 6, 1, 9, outD); r(9, 14, 2, 2, outD); }
+    if (side) { r(6, 5, 7, 3, out); r(5, 7, 4, 8, out); r(5, 8, 1, 7, outD); r(9, 7, 4, 1, outD); }
   }
-
-  // Hair
-  const tpl = HAIR[style][dir === 0 ? 'down' : dir === 1 ? 'up' : 'side'];
-  tpl.forEach((row, y) => {
-    for (let x = 0; x < row.length; x++) {
-      if (row[x] === 'H') p(x + 1, y, hair);
-      else if (row[x] === 'h') p(x + 1, y, hairD);
-    }
-  });
-
-  // Hood from behind / side covers the lower back of the head
-  if (outfit === 'Hoodie' && dir === 1) r(3, 4, 6, 4, out);
-  if (outfit === 'Hoodie' && side) r(2, 3, 3, 5, outD);
   if (outfit === 'Ninja') {
-    r(3, 3, 6, 1, out);
-    if (dir === 1) { p(5, 4, out); p(6, 4, out); }
-    if (side) { p(2, 3, out); p(1, 4, out); }
+    if (!side) { r(5, 8, 10, 1, out); r(5, 8, 1, 1, outD); }
+    if (front) { r(15, 8, 2, 1, out); p(16, 9, outD); }
+    if (back) { r(9, 9, 2, 2, out); p(8, 11, outD); p(11, 11, outD); }
+    if (side) { r(6, 8, 9, 1, out); r(3, 8, 3, 1, out); r(2, 9, 2, 1, outD); p(4, 10, outD); }
   }
   if (outfit === 'Wizard') {
-    const hat = side ? WIZ_HAT.side : WIZ_HAT.front;
-    hat.forEach((row, y) => {
-      for (let x = 0; x < row.length; x++) {
-        const ch = row[x];
-        if (ch === 'H') p(x + 1, y - 2, out);
-        else if (ch === 'h') p(x + 1, y - 2, outD);
-        else if (ch === 'Y') p(x + 1, y - 2, '#f8e050');
-      }
-    });
+    const hatD = outD, band = GOLD;
+    if (!side) {
+      r(3, 7, 14, 2, hatD); r(4, 7, 12, 1, out);
+      r(5, 5, 10, 2, out); r(6, 4, 8, 1, out); r(7, 3, 6, 1, out); r(8, 2, 5, 1, out); r(10, 1, 3, 1, out);
+      r(5, 6, 10, 1, band);
+      r(12, 2, 1, 4, hatD); r(13, 4, 1, 2, hatD);
+      if (front) { p(9, 3, '#f8e858'); r(8, 4, 3, 1, '#f8e858'); p(9, 5, '#f8e858'); }
+    } else {
+      r(4, 7, 13, 2, hatD); r(5, 7, 11, 1, out);
+      r(6, 5, 9, 2, out); r(6, 4, 7, 1, out); r(6, 3, 5, 1, out); r(5, 2, 4, 1, out); r(4, 1, 2, 1, out);
+      r(6, 6, 9, 1, band); r(6, 3, 1, 3, hatD);
+      p(11, 4, '#f8e858');
+    }
   }
   return outline(c);
 }
@@ -258,7 +361,7 @@ export function charSprite(look, facing, frame) {
     const dir = facing === 3 ? 2 : facing;
     let img = buildChar(look, dir, frame);
     if (facing === 3) img = flipped(img);
-    s = { img, ox: 7, oy: 19 };
+    s = { img, ox: 10, oy: 29 };
     charCache.set(key, s);
   }
   return s;

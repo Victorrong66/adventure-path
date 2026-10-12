@@ -160,7 +160,7 @@ export class Renderer {
   drawGiantSword(p, time) {
     const g = this.g;
     const a = giantAngle(time);
-    const cx = this.sx(p.x, p.y), cy = this.sy(p.x, p.y) - 7;
+    const cx = this.sx(p.x, p.y), cy = this.sy(p.x, p.y) - 11;
     const len = Math.round(GIANT_LEN * TILE);
     const img = giantSwordSprite(len);
     // swirl trail behind the blade
@@ -287,16 +287,16 @@ export class Renderer {
       const x = this.sx(p.x, p.y), y = this.sy(p.x, p.y);
       const label = p.name || '';
       const col = p.id === view.meId ? '#f8f8f8' : '#a8e8ff';
-      drawText(g, label, x - (textWidth(label) >> 1), y - 29, col);
+      drawText(g, label, x - (textWidth(label) >> 1), y - 39, col);
       if (!p.dead) {
         const w = 14;
-        g.fillStyle = '#301018'; g.fillRect(x - w / 2, y - 22, w, 2);
+        g.fillStyle = '#301018'; g.fillRect(x - w / 2, y - 32, w, 2);
         g.fillStyle = p.hp / p.maxHp > 0.3 ? '#58d858' : '#f83c3c';
-        g.fillRect(x - w / 2, y - 22, Math.max(0, Math.round((w * p.hp) / p.maxHp)), 2);
+        g.fillRect(x - w / 2, y - 32, Math.max(0, Math.round((w * p.hp) / p.maxHp)), 2);
       }
-      if (view.phase === 'camp' && p.ready) drawText(g, 'READY', x - 9, y - 36, '#f8d838');
+      if (view.phase === 'camp' && p.ready) drawText(g, 'READY', x - 9, y - 46, '#f8d838');
       const lv = this.fx.find((f) => f.t === 'lvl' && f.id === p.id);
-      if (lv) drawText(g, 'LEVEL UP!', x - 17, y - 40 - Math.round((1.2 - lv.life) * 10), Math.floor(lv.life * 10) % 2 ? '#f8d838' : '#ffffff');
+      if (lv) drawText(g, 'LEVEL UP!', x - 17, y - 50 - Math.round((1.2 - lv.life) * 10), Math.floor(lv.life * 10) % 2 ? '#f8d838' : '#ffffff');
     }
   }
 

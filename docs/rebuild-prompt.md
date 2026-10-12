@@ -21,7 +21,7 @@ Build a browser game called **Victor's World**: a pixel-art, co-op monster-swarm
 
 ## Characters
 - Character creator with a live, rotatable, walking preview: name (12 characters max), 6 skin tones, 8 hair styles (Short, Spiky, Long, Ponytail, Afro, Mohawk, Bun, Bald), 8 hair colors, 6 outfits (Tunic, Knight, Wizard with a pointy hat, Ninja with headband and mask, Hoodie, Overalls) and 8 outfit colors. Include a Random button.
-- Sprites are about 12x18 pixels, with 4 facing directions (down, up, right, and left as a mirror of right) and a 4-frame walk cycle.
+- Sprites are about 18x28 pixels (faces with eyes, brows, blush and mouth; shading, belts, hands and boots), with 4 facing directions (down, up, right, and left as a mirror of right) and a 4-frame walk cycle.
 - The profile (name, look and a random player ID) is saved in localStorage.
 
 ## Multiplayer (peer-to-peer, no game server)

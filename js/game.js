@@ -335,7 +335,7 @@ export class Game {
     if (typeof want === 'object') {
       const r = this.renderer;
       sx = want.x / r.scale - r.sx(me.x, me.y);
-      sy = want.y / r.scale - (r.sy(me.x, me.y) - 8);
+      sy = want.y / r.scale - (r.sy(me.x, me.y) - 12);
       me.dir = facingFromScreen(sx, sy, me.dir);
     } else if (ux || uy) { sx = ux; sy = uy; } else {
       [sx, sy] = [[0, 1], [0, -1], [1, 0], [-1, 0]][me.dir] || [0, 1];

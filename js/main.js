@@ -130,7 +130,7 @@ function demoFrame(dt) {
   renderer.draw({ world: demoWorld, players: demoHeroes, enemies: [], projs: [], pickups: [], me: null, meId: null, time: demoT, phase: 'demo' }, dt);
   // Title hero preview
   const tc = $('title-hero').getContext('2d');
-  tc.clearRect(0, 0, 14, 21);
+  tc.clearRect(0, 0, 20, 30);
   tc.drawImage(charSprite(profile.look, 0, Math.floor(demoT * 4) % 4).img, 0, 0);
 }
 let lastT = performance.now();
@@ -191,6 +191,7 @@ $('char-done').addEventListener('click', () => {
   profile = { ...profile, name, look: draft.look, created: true };
   saveProfile(profile);
   show(afterCharScreen);
+  if (afterCharScreen === 'join') joinFromInvite();
 });
 
 (function previewLoop() {
@@ -200,10 +201,10 @@ $('char-done').addEventListener('click', () => {
     g.imageSmoothingEnabled = false;
     g.clearRect(0, 0, c.width, c.height);
     g.fillStyle = 'rgba(0,0,0,0.25)';
-    g.fillRect(14, 74, 28, 4);
+    g.fillRect(20, 112, 40, 4);
     const frame = Math.floor(performance.now() / 160) % 4;
     const s = charSprite(draft.look, DIRS[previewDir], frame);
-    g.drawImage(s.img, 0, 0, 14, 21, 0, 0, 56, 84);
+    g.drawImage(s.img, 0, 0, 20, 30, 0, 0, 80, 120);
   }
   requestAnimationFrame(previewLoop);
 })();
@@ -360,8 +361,19 @@ function showToast(msg, ms = 3000) {
 // ------------------------------------------------------------------ boot
 
 const joinParam = new URLSearchParams(location.search).get('join');
-show('title');
-if (joinParam) {
-  $('join-code').value = normalizeCode(joinParam);
-  if (needCharacter('join')) show('join');
+// Invite links (?join=CODE) take you straight into the friend's world.
+// First-timers make a character first, then join automatically.
+let inviteCode = joinParam ? normalizeCode(joinParam) : '';
+if (inviteCode) { // don't rejoin on reload
+  const q = new URLSearchParams(location.search);
+  q.delete('join');
+  history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : ''));
 }
+function joinFromInvite() {
+  if (!inviteCode) return;
+  $('join-code').value = inviteCode;
+  inviteCode = '';
+  $('btn-join-go').click();
+}
+show('title');
+if (inviteCode && needCharacter('join')) { show('join'); joinFromInvite(); }
