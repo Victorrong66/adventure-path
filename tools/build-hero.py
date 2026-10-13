@@ -124,15 +124,15 @@ run_frames = {}
 # tools/hero-anim.png: the labelled animation sheet (checkerboard background, dark label
 # boxes). Each entry: the box it's in, how many frames, and how many of them to use.
 ANIM = {  # each labelled row: its box on the sheet, how many frames, how many to use
-    'idleF': ((0, 45, 740, 160), 8, 8), 'idleR': ((745, 45, 1536, 160), 9, 9),
-    'idleB': ((0, 200, 740, 312), 8, 8), 'idleL': ((745, 200, 1536, 312), 9, 9),
-    'front': ((0, 350, 740, 462), 8, 8), 'side': ((735, 350, 1536, 462), 8, 8),
-    'back': ((0, 495, 740, 612), 8, 8), 'sideL': ((745, 495, 1536, 612), 8, 8),
-    # basic attacks: the last frames turn back to face the viewer, so they're left out
-    'atk': ((0, 645, 745, 755), 6, 5), 'atkL': ((745, 645, 1536, 755), 6, 5),
-    'atkB': ((0, 785, 745, 892), 6, 6),     # upward slash, for attacking while facing away
-    'atkF': ((765, 785, 1536, 892), 6, 6),  # downward slash, for attacking while facing the viewer
-    'dash': ((0, 925, 745, 1022), 5, 5), 'dashL': ((765, 925, 1536, 1022), 5, 5),
+    'idleF': ((0, 45, 770, 158), 9, 9), 'idleR': ((780, 45, 1536, 158), 9, 9),
+    'idleB': ((0, 195, 770, 308), 9, 9), 'idleL': ((780, 195, 1536, 308), 9, 9),
+    'front': ((0, 345, 770, 452), 9, 9), 'side': ((780, 345, 1536, 452), 9, 9),
+    'back': ((0, 490, 770, 592), 9, 9), 'sideL': ((780, 490, 1536, 592), 9, 9),
+    # basic attacks: the last frame turns back to face the viewer, so it's left out
+    'atk': ((0, 625, 770, 727), 6, 5), 'atkL': ((775, 625, 1536, 727), 6, 5),
+    'atkB': ((0, 765, 775, 874), 6, 6),     # upward slash, for attacking while facing away
+    'atkF': ((780, 765, 1536, 874), 6, 6),  # downward slash, for attacking while facing the viewer
+    'dash': ((0, 915, 775, 1010), 5, 5), 'dashL': ((780, 915, 1536, 1010), 5, 5),
 }
 def cut_sheet(path, anims):
     """Cut a labelled animation sheet (checkerboard background, dark label boxes) into
@@ -243,9 +243,6 @@ def cut_sheet(path, anims):
             run_frames[name].append(cell.crop(cell.getbbox()))
 
 cut_sheet('tools/hero-anim.png', ANIM)
-# The sheet's Run (Side - Right) row barely moves its legs (it slides), so running right
-# uses the Run (Side - Left) frames mirrored, which have a proper stride.
-run_frames['side'] = [f.transpose(Image.FLIP_LEFT_RIGHT) for f in run_frames['sideL']]
 run_scale = {}  # per-animation scale overrides (none at the moment)
 k_run = 34 / (sum(f.height for f in run_frames['front']) / len(run_frames['front']))
 
