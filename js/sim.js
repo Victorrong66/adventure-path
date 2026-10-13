@@ -50,7 +50,7 @@ export const slashCooldown = (L) => SLASH_CD - 0.03 * ((L || 1) - 1);
 // Giant Sword power-up: a huge blade spins around you for a few seconds.
 export const GIANT_TIME = 5;
 // The Ogre King's ground smash: how long it takes, when in it the club lands, and its reach
-export const SMASH_TIME = 1.2, SMASH_HIT = 0.6, SMASH_R = 2.8;
+export const SMASH_TIME = 1.2, SMASH_HIT = 0.75, SMASH_R = 2.8; // the club lands on the 4th of 9 frames
 export const CHARGE_TIME = 0.7;
 // Mystery Box: spend gold, it spins, and out comes the Giant Sword.
 export const BOX_COST = 30;
