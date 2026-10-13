@@ -463,6 +463,7 @@ const SMALL = {
   coin: { pal: { Y: '#f8d838', y: '#c09018', W: '#fff8c0' }, rows: ['.YY.', 'YWYy', 'YYYy', '.yy.'] },
   heart: { pal: { R: '#f83c50', W: '#ffd0d8' }, rows: ['RR.RR', 'RWRRR', 'RRRRR', '.RRR.', '..R..'] },
   bolt: { pal: { W: '#ffffff', C: '#78e8ff' }, rows: ['.C.', 'CWC', '.C.'] },
+  plasma: { pal: { W: '#ffffff', C: '#48e8f8', B: '#2878f8' }, rows: ['.BB.', 'BCWB', 'BWCB', '.BB.'] },
   fire: { pal: { Y: '#f8f878', O: '#f87818' }, rows: ['.O.', 'OYO', '.O.'] },
   gsword: {
     pal: { S: '#f0f0ff', s: '#a0a0c0', G: '#f8d838', B: '#8c5c2c', Y: '#fff8a0' },

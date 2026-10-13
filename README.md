@@ -33,9 +33,13 @@ waves of monsters together.
   monsters back.
 - **Sword:** slash with J/K, the mouse, or the Attack button. It levels up (longer reach, more
   damage, faster swings) through level-up picks. Walk up to the **Mystery Box** next to the Reboot
-  Van spot at camp and press its glowing button (or F) to spin it for 30 gold. It flicks through a sword, axe,
-  hammer, scythe and blaster before landing on the **Giant Sword**, which slowly sinks back in: press the button again to take it before it's gone. It's an absurdly long blade
-  (9 tiles!) that spins around you for 10 seconds and cuts through everything.
+  Van spot at camp and press its glowing button (or F) to spin it for 30 gold. It rattles open and flicks
+  through its prizes until it stops on a random one, which then slowly sinks back in: press the button
+  again to take it before it's gone. Prizes (equal odds): **Hero Sword** (double damage, longer slashes,
+  15s), **Battle Axe** (slashes hit all around you, 12s), **Thunder Hammer** (ground slams that knock
+  monsters back, 12s), **Reaper Scythe** (wide slashes, kills heal you, 15s), **Plasma Blaster**
+  (rapid-fire piercing shots, 10s) and the **Giant Sword** (an absurdly long blade, 9 tiles!, spins around
+  you for 10s and cuts through everything).
 - **Fair spawns:** monsters always appear just off every player's screen, never on top of anyone.
 - **8-bit everything:** pixel art drawn in code, a pixel font, and chiptune music and sound effects.
 

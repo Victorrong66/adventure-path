@@ -1,7 +1,7 @@
 // A running game session. The game server runs the Sim and streams snapshots to
 // everyone (the host included); each player predicts their own movement and draws
 // everything else from snapshots. The host's browser keeps the world save.
-import { WEAPONS, PASSIVES, SHOP, BOX_COST, slashCooldown, ENEMY_TYPES, PROJ_KINDS, PICKUP_KINDS } from './sim.js';
+import { WEAPONS, PASSIVES, SHOP, BOX_COST, POWERS, slashCooldown, ENEMY_TYPES, PROJ_KINDS, PICKUP_KINDS } from './sim.js';
 import { World } from './world.js';
 import { screenToWorldDir, facingFromScreen, escapeHtml } from './util.js';
 import { storeWorld, loadMobFace, saveMobFace, loadRules } from './save.js';
@@ -144,11 +144,11 @@ export class Game {
     const C = this.cl;
     const seen = new Set();
     for (const a of s.pl) {
-      const [id, x, y, dir, mv, hp, maxHp, dead, level, ready, bl, au, rv, dash, gs] = a;
+      const [id, x, y, dir, mv, hp, maxHp, dead, level, ready, bl, au, rv, dash, gs, pw, pwt] = a;
       seen.add(id);
       let p = C.players.get(id);
       if (!p) { p = { id, x: x / 100, y: y / 100 }; C.players.set(id, p); }
-      Object.assign(p, { tx: x / 100, ty: y / 100, dir, mv: !!mv, hp, maxHp, dead: !!dead, level, ready: !!ready, bl, au, rv, dash: !!dash, gs: (gs || 0) / 10 });
+      Object.assign(p, { tx: x / 100, ty: y / 100, dir, mv: !!mv, hp, maxHp, dead: !!dead, level, ready: !!ready, bl, au, rv, dash: !!dash, gs: (gs || 0) / 10, pw: pw ? POWERS[pw - 1] : null, pwt: (pwt || 0) / 10 });
     }
     for (const id of C.players.keys()) if (!seen.has(id)) C.players.delete(id);
 
@@ -405,10 +405,17 @@ export class Game {
       case 'revive': if (mine) this.audio.sfx('revive'); break;
       case 'msg': this.chatLine(null, e.m); break;
       case 'box':
-        if (e.ready) { if (mine) { this.audio.sfx('lvl'); this.chatLine(null, 'The Giant Sword is yours: grab it before it sinks back in!'); } }
+        if (e.ready) { if (mine) { this.audio.sfx('lvl'); this.chatLine(null, `The ${POWERS[e.p].name} is yours: grab it before it sinks back in!`); } }
         else { this.audio.sfx('coin'); this.chatLine(null, e.m); }
         break;
       case 'card': if (mine) this.audio.sfx('pick'); this.chatLine(null, e.m); break;
+      case 'power': {
+        const pw = POWERS[e.p];
+        this.audio.sfx('giant');
+        if (mine) this.announce(pw.name.toUpperCase() + '!', pw.desc);
+        else this.chatLine(null, e.m);
+        break;
+      }
       case 'giant':
         this.audio.sfx('giant');
         if (mine) this.announce('GIANT SWORD!', 'Spin to win!');
@@ -645,6 +652,8 @@ export class Game {
     const pzh = this.pauseInfo();
     if (pzh && !pzh.p && phase !== 'wave') phaseText = `Waiting for ${pzh.n.join(', ')} to pick upgrades...`;
     if (st.wt) phaseText = 'A wave is on! You will join the party as soon as it is over.';
+    const meP = view.me;
+    if (meP && !st.dead && meP.pw && meP.pwt > 0) phaseText = `${meP.pw.name}: ${Math.ceil(meP.pwt)}s  |  ${phaseText}`;
     const van = this.state.rv === 'van';
     if (st.dead) phaseText = van ? 'You are down! A friend can take your card to the Reboot Van.' : 'You are down! A friend can revive you.';
     else if (van) {
@@ -663,7 +672,7 @@ export class Game {
     boxBtn.classList.toggle('hidden', !this.nearBox() || st.dead);
     const bx = this.state.bx;
     const take = !!(bx && bx[2] && bx[0] === this.myId);
-    const boxLabel = take ? 'Take Giant Sword! (F)' : bx ? (bx[0] === this.myId ? 'Spinning...' : 'Box in use') : `Spin Mystery Box ${BOX_COST}g (F)`;
+    const boxLabel = take ? `Take ${POWERS[bx[3]].name}! (F)` : bx ? (bx[0] === this.myId ? 'Spinning...' : 'Box in use') : `Spin Mystery Box ${BOX_COST}g (F)`;
     if (boxBtn.textContent !== boxLabel) boxBtn.textContent = boxLabel;
     boxBtn.disabled = !take && (!!bx || st.g < BOX_COST);
     boxBtn.classList.toggle('take', take);

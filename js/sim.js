@@ -39,7 +39,7 @@ const ENEMY = {
   ogre: { hp: 450, spd: 1.25, dmg: 25, r: 0.8, xp: 40, boss: true },
 };
 export const ENEMY_TYPES = Object.keys(ENEMY);
-export const PROJ_KINDS = ['bolt', 'fire'];
+export const PROJ_KINDS = ['bolt', 'fire', 'plasma'];
 export const PICKUP_KINDS = ['xp', 'xp2', 'xp3', 'coin', 'heart', 'gsword'];
 
 // Sword stats by level (1-5): reach in tiles, damage multiplier, seconds between swings.
@@ -52,6 +52,16 @@ export const BOX_COST = 30;
 export const BOX_SPIN = 3;       // seconds from opening the box to the prize
 export const BOX_SWORD = 10;     // seconds of Giant Sword it gives
 export const BOX_CLAIM = 8;      // seconds the prize hovers (sinking) before it's gone
+// What the Mystery Box can give (equal odds), in the order of the box art's frames.
+// Each is a power-up that lasts t seconds.
+export const POWERS = [
+  { k: 'sword', name: 'Hero Sword', desc: 'Double damage, longer slashes', t: 15, c: '#f8d838' },
+  { k: 'axe', name: 'Battle Axe', desc: 'Slashes hit all around you', t: 12, c: '#f84838' },
+  { k: 'hammer', name: 'Thunder Hammer', desc: 'Slams the ground, knocking monsters back', t: 12, c: '#58b8f8' },
+  { k: 'scythe', name: 'Reaper Scythe', desc: 'Wide slashes; kills heal you', t: 15, c: '#c048f0' },
+  { k: 'blaster', name: 'Plasma Blaster', desc: 'Rapid-fire piercing plasma', t: 10, c: '#48e8f8' },
+  { k: 'giant', name: 'Giant Sword', desc: 'An absurdly long spinning blade', t: BOX_SWORD, c: '#f8f0c0' },
+];
 export const GIANT_LEN = 9;      // absurdly long, in tiles
 export const GIANT_WIDTH = 0.6;  // half-width of the blade's hit area, in tiles
 export const GIANT_SPIN = 5;     // radians per second
@@ -275,6 +285,45 @@ export class Sim {
     }
   }
 
+  // Mystery Box weapons that work on their own.
+  powerTick(p, dt) {
+    const cd = p.cd;
+    if (p.pw === 'hammer') {
+      // Thunder Hammer: slam the ground, hurting and knocking back everything close
+      cd.hammer = (cd.hammer || 0) - dt;
+      if (cd.hammer > 0) return;
+      cd.hammer = 0.8;
+      const R = 3.2, dmg = (16 + 4 * p.level) * p.dmgMul;
+      let hit = false;
+      for (const e of this.enemies) {
+        if (e.dead) continue;
+        const rx = e.x - p.x, ry = e.y - p.y, d = Math.hypot(rx, ry);
+        if (d > R + e.r) continue;
+        hit = true;
+        this.hitEnemy(e, dmg, p);
+        if (!e.boss && !e.dead) {
+          const push = 1.1 / (d || 1);
+          if (ENEMY[e.type].fly) { e.x += rx * push; e.y += ry * push; } else this.world.move(e, rx * push, ry * push, e.r * 0.7);
+        }
+      }
+      if (hit) this.emit({ k: 'quake', id: p.id, x: r2(p.x), y: r2(p.y), r: R });
+      else cd.hammer = 0.1;
+    } else if (p.pw === 'blaster') {
+      // Plasma Blaster: rapid piercing shots at the nearest monster
+      cd.plasma = (cd.plasma || 0) - dt;
+      if (cd.plasma > 0) return;
+      const target = this.nearestEnemy(p.x, p.y, 10);
+      if (!target) { cd.plasma = 0.1; return; }
+      cd.plasma = 0.18;
+      const a = Math.atan2(target.y - p.y, target.x - p.x);
+      this.projs.push({
+        id: this.nid++, kind: 'plasma', x: p.x, y: p.y, vx: Math.cos(a) * 14, vy: Math.sin(a) * 14,
+        dmg: (10 + 3 * p.level) * p.dmgMul, pierce: 3, life: 0.9, hit: new Set(), by: p,
+      });
+      this.emit({ k: 'sfx', s: 'shoot', id: p.id });
+    }
+  }
+
   // Manual sword slash: hits every monster in an arc in front of the player.
   slash(p, v) {
     if (p.dead || (p.slashAt || 0) > this.t) return;
@@ -284,19 +333,24 @@ export class Sim {
     dx /= l; dy /= l;
     const L = p.weapons.sword || 1;
     p.slashAt = this.t + slashCooldown(L) - 0.05;
-    const R = swordReach(L), dmg = (14 + 3 * p.level) * (1 + 0.25 * (L - 1)) * p.dmgMul;
+    // Mystery Box weapons change the slash: reach, damage, how wide it sweeps, knockback
+    const pw = p.pw;
+    const reach = { sword: 0.8, axe: 0.5, scythe: 0.7 }[pw] || 0;
+    const mul = { sword: 2, axe: 1.8, scythe: 1.5 }[pw] || 1;
+    const arc = pw === 'axe' ? 2 : pw === 'scythe' ? 0.6 : -0.25; // how far behind you it reaches (axe: all round)
+    const R = swordReach(L) + reach, dmg = (14 + 3 * p.level) * (1 + 0.25 * (L - 1)) * p.dmgMul * mul;
     for (const e of this.enemies) {
       if (e.dead) continue;
       const rx = e.x - p.x, ry = e.y - p.y;
       const d = Math.hypot(rx, ry);
-      if (d > R + e.r || rx * dx + ry * dy < -0.25 * d) continue;
-      this.hitEnemy(e, dmg);
+      if (d > R + e.r || rx * dx + ry * dy < -arc * d) continue;
+      this.hitEnemy(e, dmg, p);
       if (!e.boss && !e.dead) {
-        const push = 0.5 / (d || 1);
+        const push = (pw === 'axe' ? 0.9 : 0.5) / (d || 1);
         if (ENEMY[e.type].fly) { e.x += rx * push; e.y += ry * push; } else this.world.move(e, rx * push, ry * push, e.r * 0.7);
       }
     }
-    this.emit({ k: 'slash', id: p.id, x: r2(p.x), y: r2(p.y), a: r2(Math.atan2(dy, dx)), r: r2(R) });
+    this.emit({ k: 'slash', id: p.id, x: r2(p.x), y: r2(p.y), a: r2(Math.atan2(dy, dx)), r: r2(R), w: pw || undefined });
   }
 
   rollChoices(p) {
@@ -330,14 +384,21 @@ export class Sim {
     const b = this.world.box, box = this.box;
     if (p.dead || Math.hypot(p.x - b.x, p.y - b.y) > 2.2) return;
     if (box.stage === 'ready' && box.user === p.id) {
+      const pw = POWERS[box.prize];
       box.user = null; box.stage = ''; box.t = 0;
-      p.giantT = Math.min(BOX_SWORD * 2, (p.giantT || 0) + BOX_SWORD);
-      this.emit({ k: 'giant', id: p.id, m: `${p.name} took the GIANT SWORD from the Mystery Box!` });
+      if (pw.k === 'giant') {
+        p.giantT = Math.min(BOX_SWORD * 2, (p.giantT || 0) + BOX_SWORD);
+        this.emit({ k: 'giant', id: p.id, m: `${p.name} took the GIANT SWORD from the Mystery Box!` });
+      } else {
+        p.pw = pw.k; p.pwT = pw.t;
+        this.emit({ k: 'power', id: p.id, p: box.prize, m: `${p.name} took the ${pw.name.toUpperCase()} from the Mystery Box!` });
+      }
       return;
     }
     if (box.stage || p.gold < BOX_COST) return;
     p.gold -= BOX_COST;
     box.user = p.id; box.stage = 'spin'; box.t = BOX_SPIN;
+    box.prize = (Math.random() * POWERS.length) | 0;
     this.emit({ k: 'box', id: p.id, m: `${p.name} spins the Mystery Box...` });
   }
 
@@ -348,11 +409,11 @@ export class Sim {
     if (box.t > 0) return;
     if (box.stage === 'spin') {
       box.stage = 'ready'; box.t = BOX_CLAIM;
-      this.emit({ k: 'box', id: box.user, ready: 1 });
+      this.emit({ k: 'box', id: box.user, ready: 1, p: box.prize });
     } else {
       const p = this.players.get(box.user);
       box.user = null; box.stage = '';
-      this.emit({ k: 'msg', m: `The Giant Sword sank back into the Mystery Box${p ? ` (${p.name} didn't take it)` : ''}.` });
+      this.emit({ k: 'msg', m: `The ${POWERS[box.prize].name} sank back into the Mystery Box${p ? ` (${p.name} didn't take it)` : ''}.` });
     }
   }
 
@@ -524,13 +585,16 @@ export class Sim {
     return best || { x: lo, y: lo };
   }
 
-  hitEnemy(e, dmg) {
+  hitEnemy(e, dmg, by) {
     if (e.dead) return;
     dmg = Math.max(1, Math.round(dmg));
     e.hp -= dmg;
     e.flash = 0.12;
     this.emit({ k: 'dmg', x: r2(e.x), y: r2(e.y), v: dmg });
-    if (e.hp <= 0) this.killEnemy(e);
+    if (e.hp <= 0) {
+      this.killEnemy(e);
+      if (by && by.pw === 'scythe' && !by.dead) by.hp = Math.min(by.maxHp, by.hp + 4); // the Reaper Scythe heals on kills
+    }
   }
 
   killEnemy(e) {
@@ -639,6 +703,11 @@ export class Sim {
       if (p.regen) p.hp = Math.min(p.maxHp, p.hp + p.regen * dt);
       if (this.phase !== 'wave' && world.inCamp(p.x, p.y)) p.hp = Math.min(p.maxHp, p.hp + 10 * dt);
       if (p.giantT > 0) { p.giantT = Math.max(0, p.giantT - dt); this.giantSword(p, dt); }
+      if (p.pw) {
+        p.pwT -= dt;
+        if (p.pwT <= 0) { p.pw = null; p.pwT = 0; }
+        else if (fighting) this.powerTick(p, dt);
+      }
       if (!fighting) continue;
 
       const cd = p.cd;
@@ -799,7 +868,7 @@ export class Sim {
         if (e.dead || q.hit.has(e.id)) continue;
         if ((e.x - q.x) ** 2 + (e.y - q.y) ** 2 < (0.3 + e.r) ** 2) {
           q.hit.add(e.id);
-          this.hitEnemy(e, q.dmg);
+          this.hitEnemy(e, q.dmg, q.by);
           if (--q.pierce <= 0) { q.life = 0; break; }
         }
       }
@@ -877,7 +946,8 @@ export class Sim {
     const pl = [];
     for (const p of this.party()) {
       pl.push([p.id, ri(p.x), ri(p.y), p.dir, p.mv ? 1 : 0, Math.ceil(p.hp), p.maxHp, p.dead ? 1 : 0,
-        p.level, p.ready ? 1 : 0, p.weapons.blades || 0, p.weapons.aura || 0, Math.round(p.reviveP * 100), p.dash ? 1 : 0, Math.ceil((p.giantT || 0) * 10)]);
+        p.level, p.ready ? 1 : 0, p.weapons.blades || 0, p.weapons.aura || 0, Math.round(p.reviveP * 100), p.dash ? 1 : 0, Math.ceil((p.giantT || 0) * 10),
+        p.pw ? POWERS.findIndex((w) => w.k === p.pw) + 1 : 0, Math.ceil((p.pwT || 0) * 10)]);
     }
     return {
       t: 's', T: Math.round(this.t * 1000) / 1000, ph: this.phase, w: this.wave, cp: this.save.checkpoint,
@@ -888,7 +958,7 @@ export class Sim {
       pr: this.projs.map((q) => [q.id, PROJ_KINDS.indexOf(q.kind), ri(q.x), ri(q.y), ri(q.vx), ri(q.vy)]),
       pk: this.pickups.map((k) => [k.id, PICKUP_KINDS.indexOf(k.kind), ri(k.x), ri(k.y)]),
       rv: this.rules.revive,
-      bx: this.box.stage ? [this.box.user, Math.ceil(this.box.t * 10), this.box.stage === 'ready' ? 1 : 0] : 0,
+      bx: this.box.stage ? [this.box.user, Math.ceil(this.box.t * 10), this.box.stage === 'ready' ? 1 : 0, this.box.prize] : 0,
       cd: [...this.cards].map(([id, c]) => [id, ri(c.x), ri(c.y), c.carrier || 0, Math.round(c.boot * 100), c.atVan ? 1 : 0]),
     };
   }

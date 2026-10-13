@@ -64,7 +64,7 @@ export class Renderer {
         break;
       case 'zap': this.addFx({ t: 'zap', x: e.x, y: e.y, life: 0.25 }); break;
       case 'slash':
-        this.addFx({ t: 'slash', x: e.x, y: e.y, a: e.a, r: e.r || 1.6, life: 0.16 });
+        this.addFx({ t: 'slash', x: e.x, y: e.y, a: e.a, r: e.r || 1.6, life: 0.16, w: e.w });
         if (e.id) this.markAttack(e.id);
         break;
       case 'hurt': {
@@ -73,6 +73,7 @@ export class Renderer {
         break;
       }
       case 'lvl': this.addFx({ t: 'lvl', id: e.id, life: 1.2 }); break;
+      case 'quake': this.addFx({ t: 'quake', x: e.x, y: e.y, r: e.r, life: 0.35 }); this.shake = Math.max(this.shake, 0.12); break;
     }
   }
 
@@ -295,8 +296,8 @@ export class Renderer {
     g.globalAlpha = 1;
   }
 
-  // The Mystery Box. Closed when idle. A spin shakes it and opens the lid, then shows
-  // each prize once, in order, landing on the Giant Sword. The prize then
+  // The Mystery Box. Closed when idle. A spin shakes it and opens the lid, then flicks
+  // through the prizes, slowing down until it lands on the one the server rolled. The prize then
   // slowly sinks back into the box until it's taken, and the lid closes again.
   drawBox(it, view, time) {
     const g = this.g;
@@ -314,12 +315,13 @@ export class Renderer {
       if (t < 0.3) frame = Math.floor(t * 12) % 2 ? BOX_SHAKE : 0; // rattle
       else if (t < OPEN) frame = BOX_OPEN[Math.min(BOX_OPEN.length - 1, Math.floor((t - 0.3) / (OPEN - 0.3) * BOX_OPEN.length))];
       else {
-        // one frame per prize, in order, ending on the Giant Sword
-        const done = Math.min(0.999, (t - OPEN) / (BOX_SPIN - OPEN));
-        frame = BOX_PRIZES[Math.floor(done * BOX_PRIZES.length)];
+        // flick through the prizes, slowing down until it stops on the one it rolled
+        const done = Math.min(1, (t - OPEN) / (BOX_SPIN - OPEN));
+        const n = BOX_PRIZES.length, steps = 15 + ((bx[3] - 15) % n + n) % n; // so the last step is the prize
+        frame = BOX_PRIZES[Math.min(steps, Math.floor(Math.pow(done, 0.6) * (steps + 1))) % n];
       }
     } else if (bx) {
-      frame = BOX_GIANT;
+      frame = BOX_PRIZES[bx[3]] ?? BOX_GIANT;
       sink = 1 - bx[1] / 10 / BOX_CLAIM; // 0 when it appears, 1 when it's gone
     } else if (this.boxClosedAt) {
       // the lid closes again
@@ -431,6 +433,12 @@ export class Renderer {
     g.globalAlpha = 1;
 
     drawShadow(g, x, y, 9);
+    if (p.pw && p.pwt > 0 && !(p.pwt < 2 && Math.floor(now / 120) % 2)) {
+      // holding a Mystery Box weapon: a ring in its colour (blinks as it runs out)
+      g.strokeStyle = p.pw.c; g.globalAlpha = 0.55 + 0.25 * Math.sin(now / 120); g.lineWidth = 1;
+      g.beginPath(); g.ellipse(x, y, 10, 4, 0, 0, Math.PI * 2); g.stroke();
+      g.globalAlpha = 1;
+    }
     // Hit: the hurt pose, flashing red
     const flash = hit && Math.floor(now / 50) % 2 === 0;
     g.drawImage(flash ? s.hurt() : s.img, x - s.ox, y - s.oy + bob, s.w, s.h);
@@ -518,17 +526,29 @@ export class Renderer {
         g.fillStyle = 'rgba(255,255,200,0.5)';
         g.fillRect(x - 6, y - 3, 12, 4);
       } else if (f.t === 'slash') {
-        // A white/yellow crescent sweeping across the front of the player.
+        // A crescent sweeping across the front of the player (all the way round with the
+        // Battle Axe, wider with the Reaper Scythe), coloured by Mystery Box weapon.
         const prog = 1 - f.life / 0.16;
-        for (let i = 0; i <= 14; i++) {
-          const a = f.a - 1.3 + (2.6 * i) / 14;
-          if (i / 14 > prog + 0.35) break;
+        const half = f.w === 'axe' ? Math.PI : f.w === 'scythe' ? 2 : 1.3;
+        const edge = { sword: '#f8d838', axe: '#f84838', scythe: '#c048f0' }[f.w] || '#f8e878';
+        const n = Math.round(half * 11);
+        for (let i = 0; i <= n; i++) {
+          const a = f.a - half + (2 * half * i) / n;
+          if (i / n > prog + 0.35) break;
           for (const r of [f.r * 0.65, f.r * 0.82, f.r]) {
             const px = this.sx(f.x + Math.cos(a) * r, f.y + Math.sin(a) * r);
             const py = this.sy(f.x + Math.cos(a) * r, f.y + Math.sin(a) * r) - 7;
-            g.fillStyle = r === f.r * 0.82 ? '#ffffff' : '#f8e878';
+            g.fillStyle = r === f.r * 0.82 ? '#ffffff' : edge;
             g.fillRect(px, py, 2, 2);
           }
+        }
+      } else if (f.t === 'quake') {
+        // Thunder Hammer: a ring of lightning blue rushing out along the ground
+        const k = 1 - f.life / 0.35, R = f.r * k;
+        g.fillStyle = `rgba(120,200,255,${0.9 * (1 - k)})`;
+        for (let i = 0; i < 40; i++) {
+          const a = (i / 40) * Math.PI * 2;
+          g.fillRect(this.sx(f.x + Math.cos(a) * R), this.sy(f.x, f.y + Math.sin(a) * R * 0.75) - 2, 3, 2);
         }
       } else if (f.t === 'lvl') {
         // drawn by name pass; a rising sparkle text
