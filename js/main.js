@@ -80,7 +80,7 @@ async function refreshSettings() {
   $('set-revive-classic').classList.toggle('on', !van);
   $('set-revive-van').classList.toggle('on', van);
   $('set-revive-desc').textContent = van
-    ? 'A downed player drops their player card. Grab it, carry it to the Reboot Van by the campfire and wait there to bring them back.'
+    ? 'A downed player drops their player card. Grab it and drop it off at the Reboot Van by the campfire; the van brings them back a few seconds later.'
     : 'Stand next to a downed player for a few seconds to revive them.';
   if (!face) return;
   $('set-face-preview').src = face;

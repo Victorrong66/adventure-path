@@ -371,11 +371,11 @@ export class Game {
     // Reboot Van mode: downed players' cards (on the ground, or carried by a friend)
     const van = this.state.rv === 'van';
     const cards = [];
-    for (const [id, x, y, carrier, boot] of (van && this.state.cd) || []) {
+    for (const [id, x, y, carrier, boot, atVan] of (van && this.state.cd) || []) {
       const r = this.roster.get(id);
       if (!r) continue;
       const by = carrier && players.find((p) => p.id === carrier);
-      cards.push({ id, look: r.look, x: by ? by.x : x / 100, y: by ? by.y : y / 100, carrier: by ? carrier : 0, boot: boot / 100 });
+      cards.push({ id, look: r.look, x: by ? by.x : x / 100, y: by ? by.y : y / 100, carrier: by ? carrier : 0, boot: boot / 100, atVan: !!atVan });
     }
     // Waiting to join (a wave is on): the camera watches the party
     const focus = me || players[0] || null;

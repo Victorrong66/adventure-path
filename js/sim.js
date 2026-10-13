@@ -739,13 +739,24 @@ export class Sim {
     this.projs = this.projs.filter((q) => q.life > 0);
   }
 
-  // Reboot Van: touch a downed player's card to pick it up, carry it to the van and
-  // stay there while it reboots them. A carrier who goes down drops what they carry.
+  // Reboot Van: touch a downed player's card to pick it up and bring it to the van.
+  // Dropping it off is enough: the van reboots them on its own while you get back to
+  // fighting. A carrier who goes down drops what they carry.
   updateCards(dt, alive) {
     const van = this.world.van;
     for (const [id, c] of this.cards) {
       const p = this.players.get(id);
       if (!p || !p.dead) { this.cards.delete(id); continue; }
+      if (c.atVan) {
+        c.boot += dt / REBOOT_TIME;
+        if (c.boot >= 1) {
+          this.revive(p, 0.5);
+          const a = Math.random() * Math.PI;
+          this.teleport(p, van.x + Math.cos(a) * 1.2, van.y + 0.6 + Math.sin(a) * 0.4);
+          this.emit({ k: 'msg', m: `${p.name} is back from the Reboot Van!` });
+        }
+        continue;
+      }
       let carrier = c.carrier && this.players.get(c.carrier);
       if (c.carrier && (!carrier || carrier.dead)) { this.dropCard(c, carrier || c); carrier = null; }
       if (!carrier) {
@@ -755,15 +766,10 @@ export class Sim {
         this.emit({ k: 'card', id: taker.id, m: `${taker.name} picked up ${p.name}'s card` });
       }
       c.x = carrier.x; c.y = carrier.y;
-      if (Math.hypot(carrier.x - van.x, carrier.y - van.y) < 2) {
-        c.boot += dt / REBOOT_TIME;
-        if (c.boot >= 1) {
-          this.revive(p, 0.5);
-          const a = Math.random() * Math.PI * 2;
-          this.teleport(p, van.x + Math.cos(a) * 0.9, van.y + 0.8 + Math.abs(Math.sin(a)) * 0.4);
-          this.emit({ k: 'msg', m: `${carrier.name} rebooted ${p.name}!` });
-        }
-      } else c.boot = Math.max(0, c.boot - dt / 2);
+      if (Math.hypot(carrier.x - van.x, carrier.y - van.y) < 2.2) {
+        c.atVan = true; c.carrier = null; c.boot = 0; c.x = van.x; c.y = van.y;
+        this.emit({ k: 'card', id: carrier.id, m: `${carrier.name} dropped ${p.name}'s card at the van. Rebooting...` });
+      }
     }
   }
 
@@ -814,7 +820,7 @@ export class Sim {
       pr: this.projs.map((q) => [q.id, PROJ_KINDS.indexOf(q.kind), ri(q.x), ri(q.y), ri(q.vx), ri(q.vy)]),
       pk: this.pickups.map((k) => [k.id, PICKUP_KINDS.indexOf(k.kind), ri(k.x), ri(k.y)]),
       rv: this.rules.revive,
-      cd: [...this.cards].map(([id, c]) => [id, ri(c.x), ri(c.y), c.carrier || 0, Math.round(c.boot * 100)]),
+      cd: [...this.cards].map(([id, c]) => [id, ri(c.x), ri(c.y), c.carrier || 0, Math.round(c.boot * 100), c.atVan ? 1 : 0]),
     };
   }
 

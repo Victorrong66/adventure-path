@@ -23,7 +23,8 @@ waves of monsters together.
   party, catches up to the party's level and picks an upgrade for each level they missed.
 - **Reviving:** in **Settings**, the host picks how downed friends come back: *Revive in Place*
   (stand next to them for 3 seconds) or *Reboot Van* (grab the player card they drop, carry it to
-  the van by the campfire and stay there 4 seconds; if you go down while carrying it, it drops).
+  the van by the campfire and drop it off; the van reboots them by itself a few seconds later, so
+  you can get straight back to fighting. If you go down while carrying a card, it drops).
 - **Monster Face Photo:** pick any photo in **Settings** on the title screen (or the host's pause
   menu). It's shrunk into a
   tiny pixel-art face and every monster wears it (with slime goo, bat wings, imp horns, a boss

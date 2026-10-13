@@ -123,9 +123,10 @@ export class Renderer {
     }
     items.push({ d: world.merchant.y, k: 'merchant', x: world.merchant.x, y: world.merchant.y });
     const cards = view.cards || [];
-    const booting = cards.reduce((m, c) => Math.max(m, c.carrier ? c.boot : 0), 0);
-    if (view.van) items.push({ d: world.van.y, k: 'van', x: world.van.x, y: world.van.y, on: booting > 0 });
-    for (const c of cards) if (!c.carrier) items.push({ d: c.y + 0.05, k: 'card', e: c });
+    const atVan = cards.filter((c) => c.atVan);
+    const booting = atVan.reduce((m, c) => Math.max(m, c.boot), 0);
+    if (view.van) items.push({ d: world.van.y, k: 'van', x: world.van.x, y: world.van.y, on: atVan.length > 0 });
+    for (const c of cards) if (!c.carrier && !c.atVan) items.push({ d: c.y + 0.05, k: 'card', e: c });
     for (const k of pickups) if (inView(k.x, k.y)) items.push({ d: k.y - 0.3, k: 'pickup', e: k });
     for (const e of enemies) if (inView(e.x, e.y)) items.push({ d: e.y, k: 'enemy', e });
     for (const p of players) items.push({ d: p.y, k: 'player', e: p });
@@ -194,7 +195,9 @@ export class Renderer {
       const v = world.van, vx = this.sx(v.x), vy = this.sy(v.x, v.y);
       const label = 'REBOOT VAN';
       drawText(g, label, vx - (textWidth(label) >> 1), vy - 66 + Math.round(Math.sin(time * 3 + 1)), '#a8e8ff');
-      if (booting > 0) {
+      // cards dropped off at the van float in its hologram while they reboot
+      atVan.forEach((c, i) => this.drawCard(c, vx + (i - (atVan.length - 1) / 2) * 14, vy - 38 + Math.round(Math.sin(time * 4 + i)), time));
+      if (atVan.length) {
         // beam of light up from the hologram while someone reboots
         g.fillStyle = `rgba(168,232,255,${0.18 + 0.1 * Math.sin(time * 12)})`;
         g.fillRect(vx - 6, vy - 200, 12, 200 - 50);
