@@ -1,7 +1,7 @@
 // A running game session. The game server runs the Sim and streams snapshots to
 // everyone (the host included); each player predicts their own movement and draws
 // everything else from snapshots. The host's browser keeps the world save.
-import { WEAPONS, PASSIVES, SHOP, slashCooldown, ENEMY_TYPES, PROJ_KINDS, PICKUP_KINDS } from './sim.js';
+import { WEAPONS, PASSIVES, SHOP, BOX_COST, slashCooldown, ENEMY_TYPES, PROJ_KINDS, PICKUP_KINDS } from './sim.js';
 import { World } from './world.js';
 import { screenToWorldDir, facingFromScreen, escapeHtml } from './util.js';
 import { storeWorld, loadMobFace, saveMobFace, loadRules } from './save.js';
@@ -379,7 +379,8 @@ export class Game {
     }
     // Waiting to join (a wave is on): the camera watches the party
     const focus = me || players[0] || null;
-    return { world: this.world, players, enemies, projs, pickups, me, focus, meId: this.myId, time, phase, van, cards };
+    const bx = this.state.bx || null; // [spinner id, tenths of a second left]
+    return { world: this.world, players, enemies, projs, pickups, me, focus, meId: this.myId, time, phase, van, cards, bx };
   }
 
   // ---------------------------------------------------------------- events & UI
@@ -399,6 +400,7 @@ export class Game {
       case 'down': this.audio.sfx('down'); this.chatLine(null, e.m); break;
       case 'revive': if (mine) this.audio.sfx('revive'); break;
       case 'msg': this.chatLine(null, e.m); break;
+      case 'box': this.audio.sfx('coin'); this.chatLine(null, e.m); break;
       case 'card': if (mine) this.audio.sfx('pick'); this.chatLine(null, e.m); break;
       case 'giant':
         this.audio.sfx('giant');
@@ -504,6 +506,7 @@ export class Game {
     if (inp.hit('m')) this.toggleMute();
     if (inp.hit('r')) this.act('ready');
     if (inp.hit('e')) this.toggleShop(!this.shopOpen);
+    if (inp.hit('f')) this.spinBox();
     for (const n of ['1', '2', '3']) if (inp.hit(n)) this.act('pick', Number(n) - 1);
   }
 
@@ -522,11 +525,25 @@ export class Game {
     this.lastShopKey = '';
   }
 
+  nearBox() {
+    const me = this.me, b = this.world.box;
+    return !!me && Math.hypot(me.x - b.x, me.y - b.y) < 2.2;
+  }
+
+  spinBox() {
+    const st = this.myStats();
+    if (!st || st.dead || !this.nearBox()) return;
+    if (this.state.bx) return this.chatLine(null, 'Someone is already spinning the Mystery Box!');
+    if (st.g < BOX_COST) return this.chatLine(null, `The Mystery Box costs ${BOX_COST} gold.`);
+    this.act('box');
+  }
+
   bindUi() {
     const handlers = [];
     const on = (id, ev, fn) => { const el = $(id); el.addEventListener(ev, fn); handlers.push(() => el.removeEventListener(ev, fn)); };
     on('act-ready', 'click', () => this.act('ready'));
     on('act-shop', 'click', () => this.toggleShop(true));
+    on('act-box', 'click', () => this.spinBox());
     on('act-dash', 'touchstart', (e) => { e.preventDefault(); this.input.touchDash = true; });
     on('act-dash', 'click', () => { this.input.touchDash = true; });
     const atkOn = (e) => { e.preventDefault(); this.input.touchAttack = true; $('act-attack').classList.add('down'); };
@@ -632,6 +649,11 @@ export class Game {
     readyBtn.classList.toggle('hidden', phase !== 'camp');
     readyBtn.textContent = meReady ? 'Not Ready (R)' : 'Ready (R)';
     $('act-shop').classList.toggle('hidden', !this.nearMerchant());
+    const boxBtn = $('act-box');
+    boxBtn.classList.toggle('hidden', !this.nearBox() || st.dead);
+    const boxLabel = this.state.bx ? 'Spinning...' : `Mystery Box ${BOX_COST}g (F)`;
+    if (boxBtn.textContent !== boxLabel) boxBtn.textContent = boxLabel;
+    boxBtn.disabled = !!this.state.bx || st.g < BOX_COST;
     if (this.shopOpen && (!this.nearMerchant() || st.dead)) this.toggleShop(false);
 
     const boss = view.enemies.find((e) => e.boss);

@@ -75,21 +75,18 @@ export class World {
       }
     }
 
-    // Camp: campfire, a cottage with a fenced front yard, barrels and the merchant's stall
+    // Camp: campfire, the merchant's stall, and up the hill the Reboot Van (only in Reboot
+    // Van mode) with the Mystery Box beside it. They're drawn on top of the map and you
+    // can walk through them.
     this.set(c, c, O.FIRE);
-    const hx = c - 6, hy = c - 6; // the cottage's door tile (bottom middle)
-    for (let y = hy - 2; y <= hy + 2; y++) for (let x = hx - 3; x <= hx + 3; x++) {
+    const hx = c - 6, hy = c - 6; // where the old cottage stood
+    for (let y = hy - 2; y <= hy + 2; y++) for (let x = hx - 3; x <= hx + 4; x++) {
       if (this.inMap(x, y)) { this.obj[y * MAP + x] = O.NONE; if (this.ground[y * MAP + x] === T.WATER) this.ground[y * MAP + x] = T.GRASS; }
     }
-    for (let y = hy - 1; y <= hy; y++) for (let x = hx - 1; x <= hx + 1; x++) this.set(x, y, O.PART);
-    this.set(hx, hy, O.HOUSE);
-    for (let x = hx - 3; x <= hx + 3; x++) if (x !== hx) this.set(x, hy + 2, O.FENCE);
-    this.set(hx + 2, hy, O.BARREL);
-    this.set(hx + 3, hy, O.BARREL);
+    this.van = { x: hx - 0.1, y: hy + 0.9 };
+    this.box = { x: hx + 3.8, y: hy + 0.9 };
     this.merchant = { x: this.cx + 3.5, y: this.cy + 2.2 };
     this.set(Math.floor(this.merchant.x), Math.floor(this.merchant.y), O.STALL);
-    // The Reboot Van parks on the other side of the fire (only drawn in Reboot Van mode).
-    this.van = { x: this.cx - 4.2, y: this.cy + 2.6 };
   }
 
   inMap(x, y) { return x >= 0 && y >= 0 && x < MAP && y < MAP; }

@@ -32,9 +32,9 @@ waves of monsters together.
   friends when they join. It's never uploaded anywhere else, and **Reset** puts the normal
   monsters back.
 - **Sword:** slash with J/K, the mouse, or the Attack button. It levels up (longer reach, more
-  damage, faster swings) through level-up picks. Monsters sometimes drop a glowing **Giant Sword**
-  (the Ogre King always does): an absurdly long blade (9 tiles!) spins around you for 5 seconds and cuts through
-  everything.
+  damage, faster swings) through level-up picks. Spin the **Mystery Box** next to the Reboot Van
+  spot at camp (30 gold, F) to get the **Giant Sword**: an absurdly long blade (9 tiles!) spins around you for
+  10 seconds and cuts through everything.
 - **8-bit everything:** pixel art drawn in code, a pixel font, and chiptune music and sound effects.
 
 ## Controls

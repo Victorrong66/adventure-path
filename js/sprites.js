@@ -560,3 +560,50 @@ export function vanSprite() {
   const w = vanImg.naturalWidth / 2, h = vanImg.naturalHeight / 2;
   return { img: vanImg, w, h, ox: Math.round(w / 2), oy: Math.round(h - 2) };
 }
+
+// The Mystery Box: a dark wooden chest with gold trim and glowing question marks.
+// Drawn at double detail (half-size pixels). `open` shows the lid flipped up.
+const boxCache = new Map();
+export function boxSprite(open = false) {
+  const key = open ? 1 : 0;
+  if (boxCache.has(key)) return boxCache.get(key);
+  const W = 48, H = 46;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const r = (col, x, y, w, h) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+  const OUT = '#141018', WOOD = '#5a3622', WOOD2 = '#3e2416', WOODL = '#7a4c2e', GOLD = '#f8d838', GOLD2 = '#c09018', GLOW = '#78e8ff';
+  // body (front face + top edge), 3/4 view
+  const by = 22;
+  r(OUT, 2, by, 44, 22);
+  r(WOOD, 4, by + 2, 40, 18);
+  for (let y = by + 6; y < by + 20; y += 5) r(WOOD2, 4, y, 40, 1); // planks
+  r(WOODL, 4, by + 2, 40, 2);
+  // gold corners and band
+  r(GOLD, 4, by + 2, 4, 18); r(GOLD, 40, by + 2, 4, 18); r(GOLD2, 7, by + 2, 1, 18); r(GOLD2, 43, by + 2, 1, 18);
+  r(GOLD, 4, by + 17, 40, 3); r(GOLD2, 4, by + 19, 40, 1);
+  // glowing "?" on the front
+  const q = (x, y, s) => {
+    r(s, x + 1, y, 4, 1); r(s, x, y + 1, 1, 2); r(s, x + 5, y + 1, 1, 3); r(s, x + 3, y + 4, 2, 1);
+    r(s, x + 3, y + 5, 1, 2); r(s, x + 3, y + 8, 1, 1);
+  };
+  q(13, by + 6, GLOW); q(29, by + 6, GLOW);
+  // lock
+  r(OUT, 21, by + 3, 6, 7); r(GOLD, 22, by + 4, 4, 5); r(OUT, 23, by + 6, 2, 2);
+  if (!open) {
+    // closed lid, curved top
+    r(OUT, 2, by - 12, 44, 14);
+    r(OUT, 4, by - 14, 40, 2);
+    r(WOOD, 4, by - 12, 40, 12); r(WOODL, 6, by - 12, 36, 2); r(WOOD2, 4, by - 2, 40, 2);
+    r(GOLD, 4, by - 12, 4, 12); r(GOLD, 40, by - 12, 4, 12); r(GOLD, 20, by - 12, 8, 12);
+    r(GOLD2, 20, by - 3, 8, 1);
+  } else {
+    // lid flipped up behind, glowing inside
+    r(OUT, 4, 2, 40, by - 2);
+    r(WOOD2, 6, 4, 36, by - 6); r(GOLD, 6, 4, 4, by - 6); r(GOLD, 38, 4, 4, by - 6);
+    r(GLOW, 4, by - 2, 40, 4); r('#e8ffff', 8, by - 1, 32, 2);
+  }
+  const s = { img: c, w: W / 2, h: H / 2, ox: W / 4, oy: H / 2 - 1 };
+  boxCache.set(key, s);
+  return s;
+}

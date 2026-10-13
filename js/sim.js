@@ -47,6 +47,10 @@ export const swordReach = (L) => 1.6 + 0.3 * ((L || 1) - 1);
 export const slashCooldown = (L) => SLASH_CD - 0.03 * ((L || 1) - 1);
 // Giant Sword power-up: a huge blade spins around you for a few seconds.
 export const GIANT_TIME = 5;
+// Mystery Box: spend gold, it spins, and out comes the Giant Sword.
+export const BOX_COST = 30;
+export const BOX_SPIN = 2.2;     // seconds of spinning before the prize
+export const BOX_SWORD = 10;     // seconds of Giant Sword it gives
 export const GIANT_LEN = 9;      // absurdly long, in tiles
 export const GIANT_WIDTH = 0.6;  // half-width of the blade's hit area, in tiles
 export const GIANT_SPIN = 5;     // radians per second
@@ -106,6 +110,7 @@ export class Sim {
     const rules = save.rules || {};
     this.rules = { revive: REVIVE_MODES.includes(rules.revive) ? rules.revive : 'classic' };
     this.cards = new Map(); // downed player id -> { x, y, carrier, boot }
+    this.box = { user: null, t: 0 }; // Mystery Box: who's spinning it, and for how long still
   }
 
   emit(e) { this.events.push(e); }
@@ -233,6 +238,8 @@ export class Sim {
       this.pick(p, v | 0);
     } else if (a === 'buy') {
       this.buy(p, v);
+    } else if (a === 'box') {
+      this.spinBox(p);
     } else if (a === 'attack') {
       this.slash(p, v);
     }
@@ -309,6 +316,26 @@ export class Sim {
     this.recalc(p);
     if (p.pendingLevels > 0) this.rollChoices(p);
     this.emit({ k: 'sfx', s: 'pick', id: p.id });
+  }
+
+  spinBox(p) {
+    const b = this.world.box;
+    if (p.dead || this.box.user || p.gold < BOX_COST || Math.hypot(p.x - b.x, p.y - b.y) > 2.2) return;
+    p.gold -= BOX_COST;
+    this.box.user = p.id; this.box.t = BOX_SPIN;
+    this.emit({ k: 'box', id: p.id, m: `${p.name} spins the Mystery Box...` });
+  }
+
+  updateBox(dt) {
+    if (!this.box.user) return;
+    this.box.t -= dt;
+    if (this.box.t > 0) return;
+    const p = this.players.get(this.box.user);
+    this.box.user = null;
+    if (!p) return;
+    if (p.dead) { p.gold += BOX_COST; return; } // went down mid-spin: money back
+    p.giantT = Math.min(BOX_SWORD * 2, (p.giantT || 0) + BOX_SWORD);
+    this.emit({ k: 'giant', id: p.id, m: `${p.name} got the GIANT SWORD from the Mystery Box!` });
   }
 
   shopCost(p, item) { return item.base + item.step * (p.perm[item.id] || 0); }
@@ -480,8 +507,6 @@ export class Sim {
     } else if (Math.random() < 0.015) {
       this.addPickup('heart', e.x, e.y, 30);
     }
-    // Rare Giant Sword power-up (the boss always drops one)
-    if (e.boss || Math.random() < 0.012) this.addPickup('gsword', e.x - 0.4, e.y + 0.3, GIANT_TIME);
   }
 
   addPickup(kind, x, y, v) {
@@ -549,6 +574,7 @@ export class Sim {
     this.updateProjectiles(dt, alive);
     this.updatePickups(dt, alive);
     if (this.cards.size) this.updateCards(dt, alive);
+    this.updateBox(dt);
 
     if (this.enemies.some((e) => e.dead)) this.enemies = this.enemies.filter((e) => !e.dead);
     if (this.phase === 'wave' && this.spawnLeft === 0 && this.enemies.length === 0) this.waveCleared();
@@ -820,6 +846,7 @@ export class Sim {
       pr: this.projs.map((q) => [q.id, PROJ_KINDS.indexOf(q.kind), ri(q.x), ri(q.y), ri(q.vx), ri(q.vy)]),
       pk: this.pickups.map((k) => [k.id, PICKUP_KINDS.indexOf(k.kind), ri(k.x), ri(k.y)]),
       rv: this.rules.revive,
+      bx: this.box.user ? [this.box.user, Math.ceil(this.box.t * 10)] : 0,
       cd: [...this.cards].map(([id, c]) => [id, ri(c.x), ri(c.y), c.carrier || 0, Math.round(c.boot * 100), c.atVan ? 1 : 0]),
     };
   }

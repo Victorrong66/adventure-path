@@ -5,10 +5,10 @@ import { TILE } from './util.js';
 import { MAP, O } from './world.js';
 import {
   charSprite, monsterSprite, monsterFrames, propSprite, smallSprite, giantSwordSprite,
-  drawText, textWidth, drawShadow, MERCHANT_LOOK, vanSprite,
+  drawText, textWidth, drawShadow, MERCHANT_LOOK, vanSprite, boxSprite,
 } from './sprites.js';
 import { paintGround, sceneSprite, TALL } from './scenery.js';
-import { bladePositions, auraRadius, giantAngle, GIANT_LEN } from './sim.js';
+import { bladePositions, auraRadius, giantAngle, GIANT_LEN, BOX_COST, BOX_SPIN } from './sim.js';
 
 const BG = '#0c1a10';
 const DETAIL = 2;
@@ -122,6 +122,7 @@ export class Renderer {
       }
     }
     items.push({ d: world.merchant.y, k: 'merchant', x: world.merchant.x, y: world.merchant.y });
+    items.push({ d: world.box.y, k: 'box', x: world.box.x, y: world.box.y });
     const cards = view.cards || [];
     const atVan = cards.filter((c) => c.atVan);
     const booting = atVan.reduce((m, c) => Math.max(m, c.boot), 0);
@@ -155,6 +156,16 @@ export class Renderer {
             g.globalAlpha = 1;
             g.globalCompositeOperation = 'source-over';
           }
+          break;
+        }
+        case 'box': {
+          const s = boxSprite(!!view.bx);
+          const x = this.sx(it.x, it.y), y = this.sy(it.x, it.y);
+          // soft blue glow on the ground
+          g.fillStyle = `rgba(120,232,255,${0.12 + 0.06 * Math.sin(time * 3)})`;
+          g.beginPath(); g.ellipse(x, y - 2, 18, 8, 0, 0, Math.PI * 2); g.fill();
+          drawShadow(g, x, y, 22);
+          g.drawImage(s.img, x - s.ox, y - s.oy, s.w, s.h);
           break;
         }
         case 'card': {
@@ -203,6 +214,28 @@ export class Renderer {
         g.fillRect(vx - 6, vy - 200, 12, 200 - 50);
         g.fillStyle = '#202030'; g.fillRect(vx - 16, vy - 58, 32, 4);
         g.fillStyle = '#a8e8ff'; g.fillRect(vx - 15, vy - 57, Math.round(30 * Math.min(1, booting)), 2);
+      }
+    }
+    // Mystery Box: its label, and while spinning, prizes flicker above it (slowing down)
+    // until the Giant Sword rises out.
+    {
+      const b = world.box, bx = this.sx(b.x), by = this.sy(b.x, b.y);
+      const label = view.bx ? 'MYSTERY BOX' : `MYSTERY BOX ${BOX_COST}G`;
+      drawText(g, label, bx - (textWidth(label) >> 1), by - 30 + Math.round(Math.sin(time * 3 + 2)), '#78e8ff');
+      if (view.bx) {
+        const left = view.bx[1] / 10, done = 1 - left / BOX_SPIN;
+        g.fillStyle = `rgba(168,232,255,${0.2 + 0.1 * Math.sin(time * 14)})`;
+        g.fillRect(bx - 5, by - 60, 10, 46);
+        const rise = Math.round(done * 14);
+        if (left > 0.35) {
+          const kinds = ['heart', 'coin', 'xp3', 'bolt', 'gsword', 'xp2'];
+          const step = Math.floor(Math.pow(done, 0.6) * 18);
+          const s = smallSprite(kinds[step % kinds.length]);
+          g.drawImage(s.img, bx - s.img.width, by - 24 - rise - s.img.height * 2, s.img.width * 2, s.img.height * 2);
+        } else {
+          const s = smallSprite('gsword');
+          g.drawImage(s.img, bx - s.img.width * 1.5, by - 26 - rise - s.img.height * 3, s.img.width * 3, s.img.height * 3);
+        }
       }
     }
     // Cards being carried float over their carrier's head
