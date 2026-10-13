@@ -141,10 +141,19 @@ export class Renderer {
         case 'obj': this.drawObj(it, time, players, enemies); break;
         case 'merchant': this.drawMerchant(it, time); break;
         case 'van': {
-          const s = vanSprite(it.on && Math.floor(time * 6) % 2 === 0);
+          const s = vanSprite();
+          if (!s) break;
           const x = this.sx(it.x, it.y), y = this.sy(it.x, it.y);
-          drawShadow(g, x, y, 44);
-          g.drawImage(s.img, x - s.ox, y - s.oy);
+          drawShadow(g, x, y - 2, 60);
+          g.drawImage(s.img, x - s.ox, y - s.oy, s.w, s.h);
+          if (it.on) {
+            // rebooting: the whole van glows and pulses
+            g.globalCompositeOperation = 'lighter';
+            g.globalAlpha = 0.25 + 0.2 * Math.sin(time * 10);
+            g.drawImage(s.img, x - s.ox, y - s.oy, s.w, s.h);
+            g.globalAlpha = 1;
+            g.globalCompositeOperation = 'source-over';
+          }
           break;
         }
         case 'card': {
@@ -184,13 +193,13 @@ export class Renderer {
     if (view.van) {
       const v = world.van, vx = this.sx(v.x), vy = this.sy(v.x, v.y);
       const label = 'REBOOT VAN';
-      drawText(g, label, vx - (textWidth(label) >> 1), vy - 46 + Math.round(Math.sin(time * 3 + 1)), '#a8e8ff');
+      drawText(g, label, vx - (textWidth(label) >> 1), vy - 66 + Math.round(Math.sin(time * 3 + 1)), '#a8e8ff');
       if (booting > 0) {
-        // beam of light while someone reboots
+        // beam of light up from the hologram while someone reboots
         g.fillStyle = `rgba(168,232,255,${0.18 + 0.1 * Math.sin(time * 12)})`;
-        g.fillRect(vx - 6, vy - 120, 12, 120 - 36);
-        g.fillStyle = '#202030'; g.fillRect(vx - 16, vy - 39, 32, 4);
-        g.fillStyle = '#a8e8ff'; g.fillRect(vx - 15, vy - 38, Math.round(30 * Math.min(1, booting)), 2);
+        g.fillRect(vx - 6, vy - 200, 12, 200 - 50);
+        g.fillStyle = '#202030'; g.fillRect(vx - 16, vy - 58, 32, 4);
+        g.fillStyle = '#a8e8ff'; g.fillRect(vx - 15, vy - 57, Math.round(30 * Math.min(1, booting)), 2);
       }
     }
     // Cards being carried float over their carrier's head

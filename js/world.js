@@ -89,7 +89,7 @@ export class World {
     this.merchant = { x: this.cx + 3.5, y: this.cy + 2.2 };
     this.set(Math.floor(this.merchant.x), Math.floor(this.merchant.y), O.STALL);
     // The Reboot Van parks on the other side of the fire (only drawn in Reboot Van mode).
-    this.van = { x: this.cx - 3.5, y: this.cy + 2.4 };
+    this.van = { x: this.cx - 4.2, y: this.cy + 2.6 };
   }
 
   inMap(x, y) { return x >= 0 && y >= 0 && x < MAP && y < MAP; }
