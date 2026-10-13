@@ -124,12 +124,12 @@ run_frames = {}
 # tools/hero-anim.png: the labelled animation sheet (checkerboard background, dark label
 # boxes). Each entry: the box it's in, how many frames, and how many of them to use.
 ANIM = {  # each labelled row: its box on the sheet, how many frames, how many to use
-    'idleF': ((0, 45, 740, 160), 8, 8), 'idleR': ((745, 45, 1536, 160), 8, 8),
-    'idleB': ((0, 200, 740, 312), 8, 8), 'idleL': ((745, 200, 1536, 312), 8, 8),
+    'idleF': ((0, 45, 740, 160), 8, 8), 'idleR': ((745, 45, 1536, 160), 9, 9),
+    'idleB': ((0, 200, 740, 312), 8, 8), 'idleL': ((745, 200, 1536, 312), 9, 9),
     'front': ((0, 350, 740, 462), 8, 8), 'side': ((735, 350, 1536, 462), 8, 8),
     'back': ((0, 495, 740, 612), 8, 8), 'sideL': ((745, 495, 1536, 612), 8, 8),
     # basic attacks: the last frames turn back to face the viewer, so they're left out
-    'atk': ((0, 645, 745, 755), 6, 5), 'atkL': ((745, 645, 1536, 755), 6, 4),
+    'atk': ((0, 645, 745, 755), 6, 5), 'atkL': ((745, 645, 1536, 755), 6, 5),
     'atkB': ((0, 785, 745, 892), 6, 6),     # upward slash, for attacking while facing away
     'atkF': ((765, 785, 1536, 892), 6, 6),  # downward slash, for attacking while facing the viewer
     'dash': ((0, 925, 745, 1022), 5, 5), 'dashL': ((765, 925, 1536, 1022), 5, 5),
@@ -164,10 +164,14 @@ def cut_sheet(path, anims):
     # Drop the drawn slash arcs, speed lines and dust: the game draws its own slash, and
     # they overlap neighbouring frames. Their blue edges go here (blades are only faintly
     # blue); what's left of them no longer touches a hero and is skipped below.
-    for y in range(AH):
-        for x in range(AW):
-            r, g, b, a = ap[x, y]
-            if a and b - r > 38 and (r + g + b) / 3 > 90: ap[x, y] = (0, 0, 0, 0)
+    # (but not sword blades: they're blue-white too, and always inside a dark outline)
+    dk = lambda q: q[3] and sum(q[:3]) < 150
+    near_dark = lambda x, y, R: any(dk(ap[x + dx, y + dy]) for dy in range(-R, R + 1) for dx in range(-R, R + 1)
+                                    if 0 <= x + dx < AW and 0 <= y + dy < AH)
+    blue = [(x, y) for y in range(AH) for x in range(AW)
+            if ap[x, y][3] and ap[x, y][2] - ap[x, y][0] > 38 and sum(ap[x, y][:3]) / 3 > 90]
+    for x, y in blue:
+        if not near_dark(x, y, 2): ap[x, y] = (0, 0, 0, 0)
     # Their white cores: thick white areas (blade highlights are only thin lines), grown
     # out through the white pixels around them.
     white = lambda q: q[3] and min(q[:3]) >= 200 and max(q[:3]) - min(q[:3]) <= 30
