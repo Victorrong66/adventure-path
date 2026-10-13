@@ -182,7 +182,7 @@ function buildSwatches(key, colors) {
 
 function updateCreator() {
   for (const el of document.querySelectorAll('.swatch')) el.classList.toggle('on', draft.look[el.dataset.sw] === Number(el.dataset.i));
-  $('lbl-hair').textContent = HAIR_STYLES[draft.look.hair];
+  $('lbl-hair').textContent = HAIR_STYLES[draft.look.bald ? 1 : 0];
   $('lbl-outfit').textContent = OUTFITS[draft.look.outfit];
   $('lbl-extra').textContent = EXTRAS[draft.look.extra | 0];
 }
@@ -192,9 +192,9 @@ document.addEventListener('click', (e) => {
   if (sw && draft) { draft.look[sw.dataset.sw] = Number(sw.dataset.i); updateCreator(); }
   const cyc = e.target.closest('[data-cyc]');
   if (cyc && draft) {
-    const k = cyc.dataset.cyc;
-    const n = k === 'hair' ? HAIR_STYLES.length : k === 'extra' ? EXTRAS.length : OUTFITS.length;
-    draft.look[k] = (draft.look[k] + Number(cyc.dataset.d) + n) % n;
+    const k = cyc.dataset.cyc === 'hair' ? 'bald' : cyc.dataset.cyc; // the hair style is spiky or bald
+    const n = k === 'bald' ? HAIR_STYLES.length : k === 'extra' ? EXTRAS.length : OUTFITS.length;
+    draft.look[k] = ((draft.look[k] | 0) + Number(cyc.dataset.d) + n) % n;
     updateCreator();
   }
 });
@@ -202,7 +202,7 @@ $('rot-left').addEventListener('click', () => { previewDir = (previewDir + 3) % 
 $('rot-right').addEventListener('click', () => { previewDir = (previewDir + 1) % 4; });
 $('char-random').addEventListener('click', () => {
   const r = (n) => (Math.random() * n) | 0;
-  draft.look = { skin: r(SKINS.length), hair: r(HAIR_STYLES.length), hairColor: r(HAIR_COLORS.length), outfit: r(OUTFITS.length), outfitColor: r(OUTFIT_COLORS.length), extra: r(EXTRAS.length) };
+  draft.look = { skin: r(SKINS.length), hair: r(HAIR_STYLES.length), hairColor: r(HAIR_COLORS.length), outfit: r(OUTFITS.length), outfitColor: r(OUTFIT_COLORS.length), extra: r(EXTRAS.length), bald: Math.random() < 0.15 ? 1 : 0 };
   updateCreator();
 });
 $('char-done').addEventListener('click', () => {

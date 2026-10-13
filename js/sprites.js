@@ -20,14 +20,14 @@ export function loadMobSheet() {
 export const SKINS = ['#ffdcb4', '#f0c08c', '#d8a070', '#b87848', '#8c5430', '#5c3418'];
 // Young adventurers off to fight monsters and dragons.
 // (Saved characters keep their numbers, so each list keeps its length.)
-export const HAIR_STYLES = ['Hero', 'Swoop', 'Flame', 'Layered', 'Wild', 'Fluffy', 'Long', 'Slick'];
+export const HAIR_STYLES = ['Spiky', 'Bald']; // look.bald: 0 or 1
 export const HAIR_COLORS = ['#2a2224', '#5a361e', '#8a5228', '#c4562a', '#e0b048', '#f0e0b0', '#4a78d0', '#e07aa8'];
-export const OUTFITS = ['Adventurer', 'Squire', 'Apprentice', 'Ranger', 'Dragonhide', 'Royal'];
+export const OUTFITS = ['Adventurer', 'Squire', 'Apprentice', 'Ranger', 'Dragonhide', 'Royal', 'Ninja'];
 // Storybook colours: red, blue, green, gold, teal, purple, orange, cream
-export const OUTFIT_COLORS = ['#c8402e', '#3a6ec0', '#4a9a3e', '#e0a830', '#2a9a9a', '#7a4ab0', '#e07028', '#e6e0cc'];
+export const OUTFIT_COLORS = ['#c8402e', '#3a6ec0', '#4a9a3e', '#e0a830', '#2a9a9a', '#7a4ab0', '#e07028', '#e6e0cc', '#3a3a46'];
 export const EXTRAS = ['None', 'Goggles', 'Headband', 'Cap', 'Beanie'];
 
-export const DEFAULT_LOOK = { skin: 1, hair: 0, hairColor: 1, outfit: 0, outfitColor: 0, extra: 0 };
+export const DEFAULT_LOOK = { skin: 1, hair: 0, hairColor: 1, outfit: 0, outfitColor: 0, extra: 0, bald: 0 };
 
 const OUTLINE = '#141018';
 
@@ -123,7 +123,7 @@ export function charSprite(look, facing, frame = 0, pose = 'walk') {
   const index = pose === 'atk' ? Math.min(n - 1, Math.floor(frame * n)) : pose === 'dash' ? Math.min(n - 1, frame) : ((frame % n) + n) % n;
   const native = NATIVE[kind];
   const flip = (native === 'left' || native === 'right') && native !== (left ? 'left' : 'right');
-  const key = `${look.skin}${look.hairColor}${look.outfit}${look.outfitColor}|${kind}|${index}|${flip ? 1 : 0}`;
+  const key = `${look.skin}${look.hairColor}${look.outfit}${look.outfitColor}${look.bald ? 'b' : ''}|${kind}|${index}|${flip ? 1 : 0}`;
   let s = charCache.get(key);
   if (!s) {
     const colors = {
@@ -131,6 +131,7 @@ export function charSprite(look, facing, frame = 0, pose = 'walk') {
       hair: HAIR_COLORS[look.hairColor] || HAIR_COLORS[0],
       outfitColor: OUTFIT_COLORS[look.outfitColor] || OUTFIT_COLORS[0],
       outfit: OUTFITS[look.outfit] || OUTFITS[0],
+      bald: !!look.bald,
     };
     const f = heroFrame(colors, kind, index, flip);
     let red = null;
