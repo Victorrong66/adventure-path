@@ -120,7 +120,7 @@ export function charSprite(look, facing, frame = 0, pose = 'walk') {
   else if (pose === 'dash') kind = facing === 3 ? 'dashL' : 'dash'; // frame = which dash frame
   else kind = pose;
   const n = heroFrameCount(kind);
-  const index = pose === 'idle' ? 0 : pose === 'atk' ? Math.min(n - 1, Math.floor(frame * n)) : pose === 'dash' ? Math.min(n - 1, frame) : ((frame % n) + n) % n;
+  const index = pose === 'atk' ? Math.min(n - 1, Math.floor(frame * n)) : pose === 'dash' ? Math.min(n - 1, frame) : ((frame % n) + n) % n;
   const native = NATIVE[kind];
   const flip = (native === 'left' || native === 'right') && native !== (left ? 'left' : 'right');
   const key = `${look.skin}${look.hairColor}${look.outfit}${look.outfitColor}|${kind}|${index}|${flip ? 1 : 0}`;

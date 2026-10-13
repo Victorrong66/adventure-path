@@ -226,7 +226,7 @@ $('char-done').addEventListener('click', () => {
     // Show off the poses: walk, breathe, swing
     const t = performance.now() % 3600;
     const s = t < 1800 ? charSprite(draft.look, DIRS[previewDir], Math.floor(t / RUN_FRAME_MS))
-      : t < 3000 ? charSprite(draft.look, DIRS[previewDir], 0, 'idle')
+      : t < 3000 ? charSprite(draft.look, DIRS[previewDir], Math.floor(t / 140), 'idle')
         : charSprite(draft.look, DIRS[previewDir], (t - 3000) / 600, 'atk');
     g.drawImage(s.img, 120 - s.ox * 5, 190 - s.oy * 5, s.img.width * 5, s.img.height * 5);
   }

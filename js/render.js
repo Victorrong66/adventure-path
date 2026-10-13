@@ -393,7 +393,7 @@ export class Renderer {
     g.fillStyle = '#e6e0cc'; g.fillRect(l, t, w, h);
     g.fillStyle = '#3a6ec0'; g.fillRect(l + 1, t + 1, w - 2, h - 4);
     // their head and shoulders, from the front-facing sprite
-    const s = charSprite(c.look, 0, 0, 'idle');
+    const s = charSprite(c.look, 0, 0, 'idle');  // (first idle frame for the card portrait)
     const sh = Math.round(s.img.height * 0.42);
     const dw = w - 2, dh = Math.round(dw * sh / s.img.width);
     g.save();
@@ -476,8 +476,7 @@ export class Renderer {
     else if (dashing) s = charSprite(p.look, p.dir, Math.floor((now - this.dashAt.get(p.id)) / (DASH_POSE_MS / 5)), 'dash');
     else if (p.mv || p.dash) s = charSprite(p.look, p.dir, Math.floor(now / RUN_FRAME_MS));
     else {
-      s = charSprite(p.look, p.dir, 0, 'idle');
-      bob = Math.floor(now / 500 + (p.id.charCodeAt(1) || 0)) % 2; // breathing
+      s = charSprite(p.look, p.dir, Math.floor(now / 140), 'idle'); // the sheet's idle loop
     }
 
     // Dash: a trail of fading afterimages

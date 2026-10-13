@@ -36,12 +36,12 @@ im = clear_checker(Image.open('tools/hero-sheet.png'))
 # walk left (9), back (5), swing right (7), swing left (7, drawn mirrored so listed
 # right-to-left), then hurt / knocked out / victory.
 F = {
- 'idleF': [(355,21,448,167)], '_front': [(355,21,448,167),(475,16,571,174),(608,16,700,174),(731,16,828,167),(862,16,958,169)],
- 'idleR': [(38,189,167,353)], '_side':  [(38,189,167,353),(165,190,299,354),(300,190,432,352),(434,191,566,354),(567,192,709,358),
+ '_front': [(355,21,448,167),(475,16,571,174),(608,16,700,174),(731,16,828,167),(862,16,958,169)],
+ '_side':  [(38,189,167,353),(165,190,299,354),(300,190,432,352),(434,191,566,354),(567,192,709,358),
            (709,191,842,353),(844,192,977,355),(994,192,1113,356),(1123,191,1250,355)],
- 'idleL': [(63,369,195,535)], '_sideL': [(63,369,195,535),(209,371,327,536),(337,371,469,534),(470,373,608,534),(609,376,752,539),
+ '_sideL': [(63,369,195,535),(209,371,327,536),(337,371,469,534),(470,373,608,534),(609,376,752,539),
            (755,377,881,539),(883,378,1013,540),(1016,378,1143,540),(1146,377,1275,539)],
- 'idleB': [(338,554,439,716)], '_back':  [(338,554,439,716),(462,554,568,716),(604,554,703,717),(736,555,837,715),(867,555,967,717)],
+ '_back':  [(338,554,439,716),(462,554,568,716),(604,554,703,717),(736,555,837,715),(867,555,967,717)],
  'hurt':  [(62,1060,187,1181)],
 }
 K = 0.2
@@ -123,14 +123,16 @@ run_frames = {}
 
 # tools/hero-anim.png: the labelled animation sheet (checkerboard background, dark label
 # boxes). Each entry: the box it's in, how many frames, and how many of them to use.
-ANIM = {
-    'front': ((0, 50, 760, 205), 8, 8), 'side': ((770, 50, 1536, 205), 8, 8),
-    'back': ((0, 240, 760, 395), 8, 8), 'sideL': ((770, 240, 1536, 395), 8, 8),
-    # basic attacks: the last two frames turn back to face the viewer, so they're left out
-    'atk': ((0, 425, 1536, 565), 9, 7), 'atkL': ((0, 570, 1536, 722), 9, 7),
-    'atkB': ((0, 722, 770, 885), 6, 6),   # upward slash, for attacking while facing away
-    'atkF': ((770, 722, 1536, 885), 6, 6),  # downward slash, for attacking while facing the viewer
-    'dash': ((0, 925, 770, 1024), 5, 5), 'dashL': ((770, 925, 1536, 1024), 5, 5),
+ANIM = {  # each labelled row: its box on the sheet, how many frames, how many to use
+    'idleF': ((0, 45, 740, 160), 8, 8), 'idleR': ((745, 45, 1536, 160), 8, 8),
+    'idleB': ((0, 200, 740, 312), 8, 8), 'idleL': ((745, 200, 1536, 312), 8, 8),
+    'front': ((0, 350, 740, 462), 8, 8), 'side': ((735, 350, 1536, 462), 8, 8),
+    'back': ((0, 495, 740, 612), 8, 8), 'sideL': ((745, 495, 1536, 612), 8, 8),
+    # basic attacks: the last frames turn back to face the viewer, so they're left out
+    'atk': ((0, 645, 745, 755), 6, 5), 'atkL': ((745, 645, 1536, 755), 6, 4),
+    'atkB': ((0, 785, 745, 892), 6, 6),     # upward slash, for attacking while facing away
+    'atkF': ((765, 785, 1536, 892), 6, 6),  # downward slash, for attacking while facing the viewer
+    'dash': ((0, 925, 745, 1022), 5, 5), 'dashL': ((765, 925, 1536, 1022), 5, 5),
 }
 def cut_sheet(path, anims):
     """Cut a labelled animation sheet (checkerboard background, dark label boxes) into
@@ -259,7 +261,7 @@ assert len(cells) == 6, f'expected 6 poses on the bottom row, found {len(cells)}
 run_frames['dizzy'] = [cells[3]]
 run_frames['down'] = [cells[4]]
 run_frames['win'] = [cells[5]]
-for name in ('front', 'side', 'sideL', 'back', 'atk', 'atkL', 'atkF', 'atkB', 'dash', 'dashL', 'dizzy', 'down', 'win'):
+for name in ('idleF', 'idleR', 'idleL', 'idleB', 'front', 'side', 'sideL', 'back', 'atk', 'atkL', 'atkF', 'atkB', 'dash', 'dashL', 'dizzy', 'down', 'win'):
     for cell in run_frames[name]:
         k = k_old if name in ('dizzy', 'down', 'win') else run_scale.get(name, k_run)
         sm = cell.resize((max(1, round(cell.width * k)), max(1, round(cell.height * k))), Image.BOX)
