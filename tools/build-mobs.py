@@ -105,6 +105,31 @@ for name, (y0, y1, height) in ROWS.items():
             frames.append((name, side, cell.crop(cell.getbbox())))
 HEIGHT = {name: h for name, (_, _, h) in ROWS.items()}
 
+def clean_alpha(path):
+    """A sheet with real transparency: just remove its label boxes."""
+    global W, H, px
+    im = Image.open(path).convert('RGBA'); W, H = im.size; px = im.load()
+    navy = lambda q: q[3] >= 128 and max(q[:3]) <= 50 and q[2] >= q[0] + 4
+    done = bytearray(W * H)
+    for y in range(H):
+        for x in range(W):
+            if done[y * W + x] or not navy(px[x, y]): continue
+            st = [(x, y)]; done[y * W + x] = 1; c = []
+            while st:
+                cx, cy = st.pop(); c.append((cx, cy))
+                for nx, ny in ((cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)):
+                    if 0 <= nx < W and 0 <= ny < H and not done[ny * W + nx] and navy(px[nx, ny]):
+                        done[ny * W + nx] = 1; st.append((nx, ny))
+            xs = [q[0] for q in c]; ys = [q[1] for q in c]
+            if len(c) > 800 and max(xs) - min(xs) > 80 and max(ys) - min(ys) < 60:
+                for yy in range(max(0, min(ys) - 3), min(H, max(ys) + 4)):
+                    for xx in range(max(0, min(xs) - 3), min(W, max(xs) + 4)): px[xx, yy] = (0, 0, 0, 0)
+    # faint glow left semi-transparent counts as empty
+    for y in range(H):
+        for x in range(W):
+            if px[x, y][3] < 128: px[x, y] = (0, 0, 0, 0)
+    return im
+
 # Sheets with one monster each and several animations, whose frames can touch:
 # each animation is (rows y0-y1, x positions of the cuts between frames).
 EXTRA = [
@@ -117,6 +142,15 @@ EXTRA = [
         'hurt': ((855, 1000), [20, 180, 310, 455, 597]),
         'die': ((855, 1000), [597, 745, 892, 1030, 1252, 1515]),
     }),
+    ('tools/ghost.png', 'ghost', 19, {  # real transparency; only its label boxes need removing
+        'left': ((120, 292), [45, 228, 412, 600, 780, 965]),
+        'right': ((120, 292), [1050, 1238, 1412, 1592, 1772, 1955]),
+        'idle': ((368, 545), [45, 228, 412, 600, 780, 965]),
+        'hurt': ((378, 552), [1050, 1240, 1425, 1612, 1835]),
+        'atkR': ((625, 778), [25, 238, 460, 740]),
+        'shot': ((625, 778), [740, 895]),
+        'die': ((622, 782), [985, 1152, 1312, 1492, 1670, 1960]),
+    }),
     ('tools/devil.png', 'imp', 26, {  # the Devil (it used to be an imp)
         'left': ((165, 352), [0, 172, 322, 467, 610, 768]),
         'right': ((165, 352), [800, 957, 1100, 1245, 1385, 1536]),
@@ -128,7 +162,7 @@ EXTRA = [
     }),
 ]
 for path, name, height, anims in EXTRA:
-    im = clean(path)
+    im = clean_alpha(path) if path.endswith('ghost.png') else clean(path)
     HEIGHT[name] = height
     for anim, ((y0, y1), cuts) in anims.items():
         cells = [[] for _ in cuts[:-1]]
@@ -145,6 +179,8 @@ for path, name, height, anims in EXTRA:
             cell = Image.new('RGBA', im.size); cp = cell.load()
             for q in c: cp[q] = px[q]
             frames.append((name, anim, cell.crop(cell.getbbox())))
+    if 'atkR' in anims:  # attacking to the left: the right-facing frames mirrored
+        frames += [(name, 'atkL', f.transpose(Image.FLIP_LEFT_RIGHT)) for n, a, f in frames if n == name and a == 'atkR']
     if name == 'imp':  # shooting to the right: the left-facing frames mirrored
         frames += [(name, 'shootR', f.transpose(Image.FLIP_LEFT_RIGHT)) for n, a, f in frames if n == name and a == 'shootL']
 
@@ -194,10 +230,7 @@ ATTACK_ROWS = {  # monster: (rows y0-y1, walk-left x range, {animation: cuts})
     'shroomling': ((355, 434), (40, 505), {'atk': [978, 1083, 1168], 'shot': [1255, 1315, 1420, 1500]}),
     'bat': ((458, 548), (40, 505), {'atk': [958, 1074, 1210, 1328], 'shot': [1328, 1415, 1515]}),
     'golem': ((563, 656), (95, 525), {'atk': [970, 1093, 1212, 1322], 'shot': [1322, 1418, 1520]}),
-    'ghost': ((930, 1014), (112, 530), {'left': [112, 198, 288, 375, 455, 530], 'right': [535, 620, 700, 790, 870, 960],
-                                        'atk': [995, 1090, 1192], 'shot': [1192, 1290, 1400, 1475]}),
-}
-HEIGHT.setdefault('ghost', 19)
+}  # (the ghost has its own sheet, tools/ghost.png)
 im = clean_gradient('tools/mob-attacks.png')
 attack_frames = []
 for name, ((y0, y1), (wx0, wx1), anims) in ATTACK_ROWS.items():
@@ -225,7 +258,6 @@ for name, anim, f, sheet_h in attack_frames:  # same size as the monster's own w
     out.append((name, 'atkR' if anim == 'atk' else anim, sm))
     if anim == 'atk': out.append((name, 'atkL', sm.transpose(Image.FLIP_LEFT_RIGHT)))
 for name, height in HEIGHT.items():
-    if name == 'ghost': continue  # all from the attack sheet
     mine = [f for f in frames if f[0] == name]
     ref = [f for f in mine if f[1] in ('left', 'right')] or mine[:1]  # size by the walk (or first) frames
     k = height * DETAIL / (sum(f[2].height for f in ref) / len(ref))

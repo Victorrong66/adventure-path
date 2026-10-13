@@ -67,7 +67,7 @@ export class Renderer {
     switch (e.k) {
       case 'dmg': this.addFx({ t: 'num', x: e.x, y: e.y, v: e.v, life: 0.7, z: 0 }); break;
       case 'die':
-        if (e.t === 'ogre' && animFrames('ogre', 'die')) this.addFx({ t: 'corpse', type: 'ogre', d: e.d || 1, x: e.x, y: e.y, life: 3, max: 3 });
+        if (animFrames(e.t, 'die')) this.addFx({ t: 'corpse', type: e.t, d: e.d || 1, x: e.x, y: e.y, life: e.t === 'ogre' ? 3 : 1.6, max: e.t === 'ogre' ? 3 : 1.6 });
         for (let i = 0; i < 6; i++) this.addFx({ t: 'part', x: e.x, y: e.y, vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3, z: 6, vz: 20 + Math.random() * 20, life: 0.5, c: { slime: '#3cb83c', imp: '#d83c2c', shroomling: '#e84838', golem: '#8c8068', bat: '#7c3c6c', goblin: '#7c8c3c' }[e.t] || '#e8e8d8' });
         if (e.t === 'ogre') this.shake = 0.6;
         break;
@@ -425,14 +425,14 @@ export class Renderer {
     else if (e.st === 2) s = play('swing', CHARGE_TIME);
     else if (e.st === 4) s = play((e.dir || 1) < 0 ? 'shootL' : 'shootR', 0.45);
     else if (e.st === 5) s = play((e.dir || 1) < 0 ? 'atkL' : 'atkR', e.type === 'goblin' || e.type === 'skeleton' ? MELEE_TIME : SHOOT_TIME);
-    else if (e.flash && e.type === 'ogre') s = monsterAnim(e.type, 'hurt', e.dir || 1, Math.floor(time * 12) % 2);
+    else if (e.flash && animFrames(e.type, 'hurt')) s = monsterAnim(e.type, 'hurt', e.dir || 1, Math.floor(time * 12) % 2);
     else if (e.st === 1) s = monsterAnim(e.type, 'idle', e.dir || 1, Math.floor(time * 6) % Math.max(1, animFrames(e.type, 'idle')));
     s = s || monsterSprite(e.type, e.dir || 1, frame);
     const fly = e.type === 'bat' || e.type === 'ghost';
     const bob = fly ? Math.round(Math.sin(time * 4 + e.id) * 2) - 6 : (nf === 1 ? (Math.floor(time * 4 + e.id) % 2) : 0);
     drawShadow(g, x, y, e.type === 'ogre' ? 18 : e.type === 'golem' ? 16 : 8);
     if (e.type === 'ghost') g.globalAlpha = 0.75;
-    const flashWhite = e.flash && !(e.type === 'ogre' && animFrames('ogre', 'hurt'));
+    const flashWhite = e.flash && !animFrames(e.type, 'hurt');
     g.drawImage(flashWhite ? s.white : s.img, x - s.ox, y - s.oy + bob, s.w || s.img.width, s.h || s.img.height);
     g.globalAlpha = 1;
     if (e.hp < e.maxHp && !e.boss && e.type !== 'ogre') {
@@ -614,7 +614,7 @@ export class Renderer {
         const t = f.max - f.life, n = animFrames(f.type, 'die');
         const s = monsterAnim(f.type, 'die', f.d, Math.min(n - 1, Math.floor(t / 0.9 * n)));
         if (s) {
-          g.globalAlpha = Math.min(1, f.life / 0.8);
+          g.globalAlpha = Math.min(1, f.life / 0.8) * (f.type === 'ghost' ? 0.75 : 1);
           g.drawImage(s.img, this.sx(f.x, f.y) - s.ox, this.sy(f.x, f.y) - s.oy, s.w, s.h);
           g.globalAlpha = 1;
         }

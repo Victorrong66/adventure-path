@@ -331,13 +331,14 @@ export function monsterSprite(type, facing, frame) {
 }
 // A monster's named animation from the sheet (e.g. the Ogre King's 'smash', the
 // Devil's 'shootL'), frame clamped to the last; null if it has none (or monsters wear
-// the photo face). Hurt and death frames face left, so they're mirrored to face right.
-const ANIM_FACES_LEFT = new Set(['hurt', 'die']);
+// the photo face). The Ogre King's hurt and death frames face left, so they're mirrored
+// to face right.
+const ANIM_FACES_LEFT = new Set(['ogre:hurt', 'ogre:die']);
 export function monsterAnim(type, anim, facing, frame) {
   const list = !mobFace && mobAtlas && MOB_FRAMES[type] && MOB_FRAMES[type][anim];
   if (!list) return null;
   const i = Math.max(0, Math.min(list.length - 1, frame));
-  const flip = ANIM_FACES_LEFT.has(anim) && facing > 0;
+  const flip = ANIM_FACES_LEFT.has(`${type}:${anim}`) && facing > 0;
   const key = `${type}|${anim}|${i}|${flip ? 1 : 0}`;
   let s = monsterCache.get(key);
   if (!s) {
