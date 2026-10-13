@@ -16,9 +16,11 @@ waves of monsters together.
   upgrades and gold are saved inside the host's world too. You can export a save to a file and
   import it on another computer, so someone else can take over hosting.
 - **Swarm combat:** auto-firing weapons, waves that get harder, an Ogre King boss every 5 waves
-  (beating it saves a checkpoint), level-up upgrades (the game pauses until everyone has picked), reviving downed friends, and a merchant
+  (beating it saves a checkpoint), level-up upgrades (during a wave the game pauses until everyone has picked; between waves it doesn't, the next wave just waits), monsters that get tougher and hit harder every wave, reviving downed friends, and a merchant
   at camp who sells permanent upgrades for gold (the shop is private: the game keeps going for
   everyone else).
+- **Joining mid-game:** someone who joins during a wave watches until it's over, then joins the
+  party, catches up to the party's level and picks an upgrade for each level they missed.
 - **Reviving:** in **Settings**, the host picks how downed friends come back: *Revive in Place*
   (stand next to them for 3 seconds) or *Reboot Van* (grab the player card they drop, carry it to
   the van by the campfire and stay there 4 seconds; if you go down while carrying it, it drops).

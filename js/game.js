@@ -305,7 +305,8 @@ export class Game {
     this.dashCd = Math.max(0, this.dashCd - dt);
     this.dashT = Math.max(0, this.dashT - dt);
     const typing = document.activeElement === $('chat-input');
-    if (stats.dead || this.pauseInfo()) { me.mv = false; me.dash = false; return; }
+    const pz = this.pauseInfo();
+    if (stats.dead || stats.wt || (pz && pz.p) || (stats.ch || []).length) { me.mv = false; me.dash = false; return; }
     const [ux, uy] = typing ? [0, 0] : this.input.move(); // walking away from the stall closes the shop
     const wantDash = !typing && this.input.dash();
     let [wx, wy] = screenToWorldDir(ux, uy);
@@ -376,7 +377,9 @@ export class Game {
       const by = carrier && players.find((p) => p.id === carrier);
       cards.push({ id, look: r.look, x: by ? by.x : x / 100, y: by ? by.y : y / 100, carrier: by ? carrier : 0, boot: boot / 100 });
     }
-    return { world: this.world, players, enemies, projs, pickups, me, meId: this.myId, time, phase, van, cards };
+    // Waiting to join (a wave is on): the camera watches the party
+    const focus = me || players[0] || null;
+    return { world: this.world, players, enemies, projs, pickups, me, focus, meId: this.myId, time, phase, van, cards };
   }
 
   // ---------------------------------------------------------------- events & UI
@@ -612,6 +615,9 @@ export class Game {
     if (phase === 'camp') phaseText = `At camp. Press R when ready (${readyCount}/${players.length})`;
     else if (phase === 'rest') phaseText = `Next wave in ${pt}...`;
     else phaseText = `${left} monsters left`;
+    const pzh = this.pauseInfo();
+    if (pzh && !pzh.p && phase !== 'wave') phaseText = `Waiting for ${pzh.n.join(', ')} to pick upgrades...`;
+    if (st.wt) phaseText = 'A wave is on! You will join the party as soon as it is over.';
     const van = this.state.rv === 'van';
     if (st.dead) phaseText = van ? 'You are down! A friend can take your card to the Reboot Van.' : 'You are down! A friend can revive you.';
     else if (van) {
@@ -646,7 +652,7 @@ export class Game {
     const key = JSON.stringify([ch, pz]);
     if (key !== this.lastChoicesKey) {
       this.lastChoicesKey = key;
-      const show = ch.length > 0 || !!pz;
+      const show = ch.length > 0 || !!(pz && pz.p);
       if (show && this.shopOpen) this.toggleShop(false);
       $('choices').classList.toggle('hidden', !show);
       $('choices').classList.toggle('waiting', !ch.length);
@@ -660,7 +666,8 @@ export class Game {
       if (pz) {
         const me = this.profile.name;
         const pickers = pz.n.filter((n) => !(ch.length && n === me));
-        if (!ch.length) wait = `Waiting for ${pickers.join(', ')} to pick an upgrade...`;
+        if (!pz.p) wait = 'The next wave waits until you pick.';
+        else if (!ch.length) wait = `Waiting for ${pickers.join(', ')} to pick an upgrade...`;
         else if (pickers.length) wait = `The game is paused until everyone picks. Also waiting for ${pickers.join(', ')}.`;
         else wait = 'The game is paused until you pick.';
         wait += ` (auto-pick in ${pz.t}s)`;

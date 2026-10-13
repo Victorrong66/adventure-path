@@ -110,6 +110,9 @@ export class Sim {
 
   emit(e) { this.events.push(e); }
 
+  // Everyone actually playing (people who joined mid-wave wait until it's over).
+  party() { return [...this.players.values()].filter((p) => !p.waiting); }
+
   // ------------------------------------------------------------ players
 
   addPlayer(id, { pid, name, look }) {
@@ -133,11 +136,38 @@ export class Sim {
     }
     this.recalc(p);
     p.hp = p.maxHp;
-    if (p.pendingLevels > 0) this.rollChoices(p);
+    const others = this.party().length;
     this.players.set(id, p);
     this.storePlayer(p);
-    this.emit({ k: 'msg', m: `${p.name} joined the world` });
+    if (this.phase === 'wave' && others) {
+      // Don't drop someone into the middle of a fight: they jump in once the wave is over.
+      p.waiting = true;
+      this.emit({ k: 'msg', m: `${p.name} is here and will join when this wave is over` });
+    } else this.bringIn(p);
     return p;
+  }
+
+  // A player joins the party: they catch up to the party's level and get to pick
+  // an upgrade for every level they missed.
+  bringIn(p) {
+    const wasWaiting = p.waiting;
+    p.waiting = false;
+    const target = Math.max(0, ...this.party().filter((o) => o !== p).map((o) => o.level));
+    let msg = `${p.name} joined the party`;
+    if (p.level < target) {
+      p.pendingLevels += target - p.level;
+      p.level = target; p.xp = 0; p.xpNext = xpFor(target);
+      msg += ` and caught up to level ${target}`;
+      this.emit({ k: 'lvl', id: p.id });
+    }
+    this.recalc(p);
+    p.hp = p.maxHp;
+    if (p.pendingLevels > 0 && !p.choices.length) this.rollChoices(p);
+    if (wasWaiting) {
+      const s = this.world.campSpot(this.players.size);
+      this.teleport(p, s.x, s.y);
+    }
+    this.emit({ k: 'msg', m: msg + '!' });
   }
 
   removePlayer(id) {
@@ -179,7 +209,7 @@ export class Sim {
 
   setInput(id, inp) {
     const p = this.players.get(id);
-    if (!p || inp.tpn !== p.tpn) return; // ignore stale positions from before a teleport
+    if (!p || p.waiting || inp.tpn !== p.tpn) return; // ignore stale positions from before a teleport
     if (!p.dead && Number.isFinite(inp.x) && Number.isFinite(inp.y)) {
       p.x = Math.max(1, Math.min(MAP - 1, inp.x));
       p.y = Math.max(1, Math.min(MAP - 1, inp.y));
@@ -196,7 +226,7 @@ export class Sim {
 
   action(id, a, v) {
     const p = this.players.get(id);
-    if (!p) return;
+    if (!p || p.waiting) return;
     if (a === 'ready' && this.phase === 'camp') {
       p.ready = !p.ready;
     } else if (a === 'pick') {
@@ -299,7 +329,7 @@ export class Sim {
   }
 
   gainXp(v) {
-    for (const p of this.players.values()) {
+    for (const p of this.party()) {
       p.xp += v;
       while (p.xp >= p.xpNext) {
         p.xp -= p.xpNext;
@@ -341,7 +371,7 @@ export class Sim {
   // ------------------------------------------------------------ waves
 
   startWave() {
-    const n = Math.max(1, this.players.size);
+    const n = Math.max(1, this.party().length);
     this.phase = 'wave';
     this.spawnLeft = Math.round((8 + this.wave * 5) * (1 + 0.4 * (n - 1)));
     this.spawnT = 1;
@@ -356,10 +386,11 @@ export class Sim {
 
   waveCleared() {
     const w = this.wave;
-    for (const p of this.players.values()) {
+    for (const p of this.party()) {
       p.gold += 4 + w * 2;
       if (p.dead) this.revive(p, 0.3);
     }
+    for (const p of this.players.values()) if (p.waiting) this.bringIn(p);
     this.save.bestWave = Math.max(this.save.bestWave || 0, w);
     this.projs = this.projs.filter((q) => q.kind !== 'fire');
     this.wave++;
@@ -370,7 +401,7 @@ export class Sim {
     } else {
       this.phase = 'rest';
       this.phaseT = 7;
-      this.emit({ k: 'clear', w, m: `Wave ${w} cleared! +${4 + w * 2} gold` });
+      this.emit({ k: 'clear', w, m: `Wave ${w} cleared! +${4 + w * 2} gold. The monsters grow stronger...` });
     }
     this.onSave?.();
   }
@@ -381,6 +412,7 @@ export class Sim {
     this.enemies = []; this.projs = []; this.pickups = [];
     let i = 0;
     for (const p of this.players.values()) {
+      if (p.waiting) { this.bringIn(p); continue; }
       this.revive(p, 1);
       const s = this.world.campSpot(i++);
       this.teleport(p, s.x, s.y);
@@ -400,7 +432,7 @@ export class Sim {
   }
 
   spawnEnemy(type) {
-    const alive = [...this.players.values()].filter((p) => !p.dead);
+    const alive = this.party().filter((p) => !p.dead);
     const anchor = alive[(Math.random() * alive.length) | 0] || { x: this.world.cx, y: this.world.cy };
     const def = ENEMY[type];
     let x = 0, y = 0;
@@ -410,13 +442,14 @@ export class Sim {
       y = Math.max(2.6, Math.min(MAP - 2.6, anchor.y + Math.sin(a) * d));
       if (!this.world.hit(x, y, def.r) && !this.world.inCamp(x, y)) break;
     }
-    const n = Math.max(1, this.players.size);
-    const hpMul = (1 + 0.2 * (this.wave - 1)) * (1 + 0.5 * (n - 1));
+    const n = Math.max(1, this.party().length);
+    const L = this.wave - 1; // monsters level up with every wave
+    const hpMul = (1 + 0.3 * L) * (1 + 0.5 * (n - 1));
     const hp = Math.round(def.hp * hpMul);
     this.enemies.push({
       id: this.nid++, type, x, y, hp, maxHp: hp,
       spd: def.spd * (1 + Math.min(0.4, this.wave * 0.015)),
-      dmg: Math.round(def.dmg * (1 + 0.08 * (this.wave - 1))),
+      dmg: Math.round(def.dmg * (1 + 0.13 * L)),
       r: def.r, dir: 1, flash: 0, cd: 2 + Math.random() * 2, charge: 0, cvx: 0, cvy: 0,
       boss: !!def.boss, dead: false, auraT: 0, bladeT: 0,
     });
@@ -473,19 +506,20 @@ export class Sim {
   // ------------------------------------------------------------ update
 
   update(dt) {
-    const all = [...this.players.values()];
-    // Level-up time: the whole world waits until every player has picked their upgrade.
+    const all = this.party();
+    // Level-up time. During a wave the whole world waits until every player has picked
+    // their upgrade; between waves nobody is paused, the next wave just waits for them.
     // (The shop doesn't pause anything: only the shopper sees it.)
     const picking = all.filter((p) => p.choices.length);
     if (picking.length) {
-      if (!this.paused) { this.paused = true; this.pickT = PICK_TIME; }
+      if (!this.picking) { this.picking = true; this.pickT = PICK_TIME; }
       this.pickT -= dt;
       if (this.pickT <= 0) {
         for (const p of picking) this.pick(p, (Math.random() * p.choices.length) | 0);
         this.pickT = PICK_TIME;
       }
-      return;
-    }
+      if (this.phase === 'wave') { this.paused = true; return; }
+    } else this.picking = false;
     if (this.paused) {
       this.paused = false;
       for (const p of all) p.inv = Math.max(p.inv, 1); // a moment to react when play resumes
@@ -495,9 +529,9 @@ export class Sim {
 
     // Phase logic
     if (this.phase === 'camp') {
-      if (all.length && all.every((p) => p.ready)) this.startWave();
+      if (all.length && all.every((p) => p.ready) && !picking.length) this.startWave();
     } else if (this.phase === 'rest') {
-      this.phaseT -= dt;
+      if (!picking.length) this.phaseT -= dt;
       if (this.phaseT <= 0) this.startWave();
     } else if (this.phase === 'wave') {
       this.spawnT -= dt;
@@ -767,7 +801,7 @@ export class Sim {
   snapshot() {
     const ri = (v) => Math.round(v * 100);
     const pl = [];
-    for (const p of this.players.values()) {
+    for (const p of this.party()) {
       pl.push([p.id, ri(p.x), ri(p.y), p.dir, p.mv ? 1 : 0, Math.ceil(p.hp), p.maxHp, p.dead ? 1 : 0,
         p.level, p.ready ? 1 : 0, p.weapons.blades || 0, p.weapons.aura || 0, Math.round(p.reviveP * 100), p.dash ? 1 : 0, Math.ceil((p.giantT || 0) * 10)]);
     }
@@ -784,13 +818,12 @@ export class Sim {
     };
   }
 
-  // Who we're waiting on while paused (null when not paused): n = picking a
-  // level-up (auto-pick in t seconds).
+  // Who's picking a level-up (null if nobody): n = their names, t = seconds until one
+  // is picked for them, p = 1 if the game is paused for it (only during a wave).
   pauseInfo() {
-    if (!this.paused) return null;
-    const n = [...this.players.values()].filter((p) => p.choices.length).map((p) => p.name);
+    const n = this.party().filter((p) => p.choices.length).map((p) => p.name);
     if (!n.length) return null;
-    return { n, t: Math.max(0, Math.ceil(this.pickT)) };
+    return { n, t: Math.max(0, Math.ceil(this.pickT)), p: this.paused ? 1 : 0 };
   }
 
   privateView(id) {
@@ -799,6 +832,7 @@ export class Sim {
     return {
       lv: p.level, xp: p.xp, xn: p.xpNext, g: p.gold, ch: p.choices, w: p.weapons, ps: p.passives,
       pm: p.perm, spd: p.spd, tpn: p.tpn, hp: Math.ceil(p.hp), mhp: p.maxHp, dead: p.dead,
+      wt: !!p.waiting,
     };
   }
 }

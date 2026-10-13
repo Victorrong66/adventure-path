@@ -84,8 +84,9 @@ export class Renderer {
     this.buildGround(world);
 
     // Camera follows the local player (smoothly)
-    const fx = (me ? me.x : world.cx) * TILE;
-    const fy = (me ? me.y : world.cy) * TILE - 8;
+    const focus = view.focus || me;
+    const fx = (focus ? focus.x : world.cx) * TILE;
+    const fy = (focus ? focus.y : world.cy) * TILE - 8;
     this.cam.x += (fx - this.cam.x) * Math.min(1, dt * 10);
     this.cam.y += (fy - this.cam.y) * Math.min(1, dt * 10);
     if (Math.abs(fx - this.cam.x) > 200) { this.cam.x = fx; this.cam.y = fy; }
