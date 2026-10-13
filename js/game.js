@@ -654,6 +654,7 @@ export class Game {
     if (st.wt) phaseText = 'A wave is on! You will join the party as soon as it is over.';
     const meP = view.me;
     if (meP && !st.dead && meP.pw && meP.pwt > 0) phaseText = `${meP.pw.name}: ${Math.ceil(meP.pwt)}s  |  ${phaseText}`;
+    if (phase === 'wave' && st.pn > 0) phaseText += `  |  ${st.pn} upgrade${st.pn > 1 ? 's' : ''} after this wave`;
     const van = this.state.rv === 'van';
     if (st.dead) phaseText = van ? 'You are down! A friend can take your card to the Reboot Van.' : 'You are down! A friend can revive you.';
     else if (van) {

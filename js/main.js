@@ -15,10 +15,10 @@ import {
   loadProfile, saveProfile, listWorlds, getWorld, storeWorld, deleteWorld, exportWorld, importWorld,
 } from './save.js';
 import { escapeHtml } from './util.js';
-import { loadHeroSheet } from './sprites.js';
+import { loadHeroSheet, loadMobSheet } from './sprites.js';
 
 // The hero sprites must be loaded before anything is drawn.
-await loadHeroSheet();
+await Promise.all([loadHeroSheet(), loadMobSheet()]);
 
 const $ = (id) => document.getElementById(id);
 

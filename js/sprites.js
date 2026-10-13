@@ -2,7 +2,20 @@
 // monsters and props come from little pixel templates.
 
 import { heroFrame, heroFrameCount } from './hero.js';
+import { MOB_FRAMES } from './mob-frames.js';
 export { loadHeroSheet } from './hero.js';
+
+// Monster art (assets/mobs.png, built from tools/mobs.png by tools/build-mobs.py):
+// walk cycles facing left and right, at twice game size.
+let mobAtlas = null;
+export function loadMobSheet() {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => { mobAtlas = img; resolve(); };
+    img.onerror = () => reject(new Error('Could not load the monster sprites.'));
+    img.src = 'assets/mobs.png';
+  });
+}
 
 export const SKINS = ['#ffdcb4', '#f0c08c', '#d8a070', '#b87848', '#8c5430', '#5c3418'];
 // Young adventurers off to fight monsters and dragons.
@@ -297,6 +310,16 @@ export function monsterSprite(type, facing, frame) {
       monsterCache.set(key, s);
       return s;
     }
+    const sheet = MOB_FRAMES[type] && mobAtlas && MOB_FRAMES[type][facing < 0 ? 'left' : 'right'];
+    if (sheet) {
+      const [sx, sy, w, h, ax] = sheet[frame % sheet.length];
+      const { c, g } = mk(w, h);
+      g.drawImage(mobAtlas, sx, sy, w, h, 0, 0, w, h);
+      // drawn at half size: w/h and the anchor are in game pixels
+      s = { img: c, white: whiteOf(c), w: w / 2, h: h / 2, ox: ax / 2, oy: h / 2 - 0.5 };
+      monsterCache.set(key, s);
+      return s;
+    }
     const tpl = MONSTER_TPL[type];
     const rows = tpl.frames[frame % tpl.frames.length];
     let img = fromTemplate(rows, tpl.pal);
@@ -306,7 +329,8 @@ export function monsterSprite(type, facing, frame) {
   }
   return s;
 }
-export const monsterFrames = (type) => (mobFace ? (type === 'bat' ? 2 : 1) : MONSTER_TPL[type].frames.length);
+export const monsterFrames = (type) => (mobFace ? (type === 'bat' ? 2 : 1)
+  : MOB_FRAMES[type] ? Math.max(MOB_FRAMES[type].left.length, MOB_FRAMES[type].right.length) : MONSTER_TPL[type].frames.length);
 
 // ---------------------------------------------------------------- photo-face monsters
 // The host can pick a photo; it's shrunk to a 32x32 pixel-art face (only that tiny

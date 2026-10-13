@@ -36,6 +36,8 @@ const ENEMY = {
   skeleton: { hp: 42, spd: 1.3, dmg: 14, r: 0.38, xp: 3, minWave: 5, weight: 5 },
   ghost: { hp: 30, spd: 1.5, dmg: 12, r: 0.35, xp: 3, minWave: 7, weight: 4, fly: true },
   imp: { hp: 26, spd: 1.4, dmg: 8, r: 0.35, xp: 3, minWave: 9, weight: 3, ranged: true },
+  shroomling: { hp: 34, spd: 1.2, dmg: 10, r: 0.35, xp: 2, minWave: 4, weight: 5 },
+  golem: { hp: 160, spd: 0.75, dmg: 22, r: 0.6, xp: 8, minWave: 8, weight: 2 },
   ogre: { hp: 450, spd: 1.25, dmg: 25, r: 0.8, xp: 40, boss: true },
 };
 export const ENEMY_TYPES = Object.keys(ENEMY);
@@ -180,7 +182,7 @@ export class Sim {
     }
     this.recalc(p);
     p.hp = p.maxHp;
-    if (p.pendingLevels > 0 && !p.choices.length) this.rollChoices(p);
+    if (p.pendingLevels > 0 && !p.choices.length && this.phase !== 'wave') this.rollChoices(p);
     if (wasWaiting) {
       const s = this.world.campSpot(this.players.size);
       this.teleport(p, s.x, s.y);
@@ -444,8 +446,14 @@ export class Sim {
         p.pendingLevels++;
         this.emit({ k: 'lvl', id: p.id });
       }
-      if (p.pendingLevels > 0 && !p.choices.length) this.rollChoices(p);
+      // upgrades are picked between waves: during one, level-ups just add up
+      if (p.pendingLevels > 0 && !p.choices.length && this.phase !== 'wave') this.rollChoices(p);
     }
+  }
+
+  // Wave over: everyone picks the upgrades they earned (the next wave waits for them).
+  offerUpgrades() {
+    for (const p of this.party()) if (p.pendingLevels > 0 && !p.choices.length) this.rollChoices(p);
   }
 
   hurtPlayer(p, dmg) {
@@ -509,6 +517,7 @@ export class Sim {
       this.phaseT = 7;
       this.emit({ k: 'clear', w, m: `Wave ${w} cleared! +${4 + w * 2} gold. The monsters grow stronger...` });
     }
+    this.offerUpgrades();
     this.onSave?.();
   }
 
@@ -524,6 +533,7 @@ export class Sim {
       this.teleport(p, s.x, s.y);
       p.ready = false;
     }
+    this.offerUpgrades();
     this.emit({ k: 'wipe', m: `Your party fell... Back to wave ${this.wave}.` });
     this.onSave?.();
   }
@@ -977,7 +987,7 @@ export class Sim {
     return {
       lv: p.level, xp: p.xp, xn: p.xpNext, g: p.gold, ch: p.choices, w: p.weapons, ps: p.passives,
       pm: p.perm, spd: p.spd, tpn: p.tpn, hp: Math.ceil(p.hp), mhp: p.maxHp, dead: p.dead,
-      wt: !!p.waiting,
+      wt: !!p.waiting, pn: p.pendingLevels,
     };
   }
 }

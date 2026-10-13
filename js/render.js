@@ -65,7 +65,7 @@ export class Renderer {
     switch (e.k) {
       case 'dmg': this.addFx({ t: 'num', x: e.x, y: e.y, v: e.v, life: 0.7, z: 0 }); break;
       case 'die':
-        for (let i = 0; i < 6; i++) this.addFx({ t: 'part', x: e.x, y: e.y, vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3, z: 6, vz: 20 + Math.random() * 20, life: 0.5, c: e.t === 'slime' ? '#3cb83c' : e.t === 'imp' ? '#d83c2c' : '#e8e8d8' });
+        for (let i = 0; i < 6; i++) this.addFx({ t: 'part', x: e.x, y: e.y, vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3, z: 6, vz: 20 + Math.random() * 20, life: 0.5, c: { slime: '#3cb83c', imp: '#d83c2c', shroomling: '#e84838', golem: '#8c8068', bat: '#7c3c6c', goblin: '#7c8c3c' }[e.t] || '#e8e8d8' });
         if (e.t === 'ogre') this.shake = 0.6;
         break;
       case 'zap': this.addFx({ t: 'zap', x: e.x, y: e.y, life: 0.25 }); break;
@@ -383,13 +383,13 @@ export class Renderer {
     const g = this.g;
     const x = this.sx(e.x, e.y), y = this.sy(e.x, e.y);
     const nf = monsterFrames(e.type);
-    const frame = nf > 1 ? Math.floor(time * (e.type === 'bat' ? 10 : 4) + e.id) % nf : 0;
+    const frame = nf > 1 ? Math.floor(time * (e.type === 'bat' ? 10 : nf >= 5 ? 8 : 4) + e.id) % nf : 0;
     const s = monsterSprite(e.type, e.dir || 1, frame);
     const fly = e.type === 'bat' || e.type === 'ghost';
     const bob = fly ? Math.round(Math.sin(time * 4 + e.id) * 2) - 6 : (nf === 1 ? (Math.floor(time * 4 + e.id) % 2) : 0);
-    drawShadow(g, x, y, e.type === 'ogre' ? 18 : 8);
+    drawShadow(g, x, y, e.type === 'ogre' ? 18 : e.type === 'golem' ? 16 : 8);
     if (e.type === 'ghost') g.globalAlpha = 0.75;
-    g.drawImage(e.flash ? s.white : s.img, x - s.ox, y - s.oy + bob);
+    g.drawImage(e.flash ? s.white : s.img, x - s.ox, y - s.oy + bob, s.w || s.img.width, s.h || s.img.height);
     g.globalAlpha = 1;
     if (e.hp < e.maxHp && !e.boss && e.type !== 'ogre') {
       const w = 10;
