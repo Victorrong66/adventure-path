@@ -5,7 +5,7 @@ import { TILE } from './util.js';
 import { MAP, O } from './world.js';
 import {
   charSprite, monsterSprite, monsterFrames, propSprite, smallSprite, giantSwordSprite,
-  drawText, textWidth, drawShadow, MERCHANT_LOOK, vanSprite, boxSprite, BOX_FRAMES, BOX_CLOSED, BOX_GIANT, BOX_BODY,
+  drawText, textWidth, drawShadow, MERCHANT_LOOK, vanSprite, boxSprite, BOX_SHAKE, BOX_OPEN, BOX_PRIZES, BOX_GIANT, BOX_BODY,
 } from './sprites.js';
 import { paintGround, sceneSprite, TALL } from './scenery.js';
 import { bladePositions, auraRadius, giantAngle, GIANT_LEN, BOX_COST, BOX_SPIN, BOX_CLAIM } from './sim.js';
@@ -295,40 +295,53 @@ export class Renderer {
     g.globalAlpha = 1;
   }
 
-  // The Mystery Box. Closed when idle; while spinning it flicks through every weapon,
-  // slowing down until it lands on the Giant Sword; then the prize slowly sinks back
-  // into the box until it's taken.
+  // The Mystery Box. Closed when idle. A spin shakes it and opens the lid, then flicks
+  // through every prize, slowing down until it lands on the Giant Sword. The prize then
+  // slowly sinks back into the box until it's taken, and the lid closes again.
   drawBox(it, view, time) {
     const g = this.g;
     const x = this.sx(it.x, it.y), y = this.sy(it.x, it.y);
     g.fillStyle = `rgba(248,200,80,${0.10 + 0.05 * Math.sin(time * 3)})`;
     g.beginPath(); g.ellipse(x, y - 2, 20, 8, 0, 0, Math.PI * 2); g.fill();
     drawShadow(g, x, y, 26);
-    const bx = view.bx;
-    let frame = BOX_CLOSED, sink = 0;
+    const bx = view.bx, now = performance.now();
+    if (bx) this.boxOpenAt = now; else if (this.boxOpenAt && !this.boxClosedAt) this.boxClosedAt = now;
+    if (bx) this.boxClosedAt = 0;
+    let frame = 0, sink = 0;
     if (bx && !bx[2]) {
-      const done = Math.min(1, 1 - bx[1] / 10 / BOX_SPIN);
-      const steps = 16; // frames shown over the whole spin, closer together at the start
-      const step = Math.floor(Math.pow(done, 0.55) * steps);
-      const offset = ((BOX_GIANT - steps) % BOX_FRAMES + BOX_FRAMES) % BOX_FRAMES; // so the last step is the Giant Sword
-      frame = done > 0.93 ? BOX_GIANT : (step + offset) % BOX_FRAMES;
+      const t = BOX_SPIN - bx[1] / 10; // seconds since the spin started
+      const OPEN = 0.75;
+      if (t < 0.3) frame = Math.floor(t * 12) % 2 ? BOX_SHAKE : 0; // rattle
+      else if (t < OPEN) frame = BOX_OPEN[Math.min(BOX_OPEN.length - 1, Math.floor((t - 0.3) / (OPEN - 0.3) * BOX_OPEN.length))];
+      else {
+        const done = Math.min(1, (t - OPEN) / (BOX_SPIN - OPEN));
+        const n = BOX_PRIZES.length, steps = 16; // prizes shown over the spin, quick at first
+        const step = Math.floor(Math.pow(done, 0.55) * steps);
+        const last = BOX_PRIZES.indexOf(BOX_GIANT);
+        frame = done > 0.93 ? BOX_GIANT : BOX_PRIZES[(step + ((last - steps) % n + n)) % n];
+      }
     } else if (bx) {
       frame = BOX_GIANT;
       sink = 1 - bx[1] / 10 / BOX_CLAIM; // 0 when it appears, 1 when it's gone
+    } else if (this.boxClosedAt) {
+      // the lid closes again
+      const k = Math.floor((now - this.boxClosedAt) / 70);
+      if (k < BOX_OPEN.length) frame = BOX_OPEN[BOX_OPEN.length - 1 - k];
+      else { this.boxClosedAt = 0; this.boxOpenAt = 0; }
     }
     const s = boxSprite(frame);
     if (!s) return;
     const left = x - s.ox, top = y - s.oy;
     if (!sink) { g.drawImage(s.img, s.sx, 0, s.sw, s.sh, left, top, s.w, s.h); return; }
     // the chest stays put; everything above it (lid, glow, prize) sinks into it
-    const bodySh = BOX_BODY, bodyTop = s.sh - bodySh;
+    const bodyTop = s.sh - BOX_BODY;
     const cut = top + bodyTop / 2;
-    const drop = Math.round(sink * (bodyTop / 2 - 6));
+    const drop = Math.round(sink * (bodyTop / 2 - 4));
     g.save();
     g.beginPath(); g.rect(left - 20, top - 40, s.w + 40, cut - top + 40); g.clip();
     g.drawImage(s.img, s.sx, 0, s.sw, bodyTop, left, top + drop, s.w, bodyTop / 2);
     g.restore();
-    g.drawImage(s.img, s.sx, bodyTop, s.sw, bodySh, left, cut, s.w, bodySh / 2);
+    g.drawImage(s.img, s.sx, bodyTop, s.sw, BOX_BODY, left, cut, s.w, BOX_BODY / 2);
   }
 
   // A downed player's card: a little framed portrait of them.

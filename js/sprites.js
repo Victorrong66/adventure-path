@@ -545,12 +545,13 @@ export function vanSprite() {
   return { img: vanImg, w, h, ox: Math.round(w / 2), oy: Math.round(h - 2) };
 }
 
-// The Mystery Box (assets/box-prizes.png, built by tools/build-box.py): six open-box
-// frames, one per weapon (sword, axe, hammer, scythe, blaster, Giant Sword), then the
-// closed box. Frames are drawn at half size on the detail canvas, feet at (ox, oy).
-export const BOX_FRAMES = 6, BOX_CLOSED = 6, BOX_GIANT = 5;
-const BOX_FW = 128;
-export const BOX_BODY = 29; // height of the chest's front panel, in sheet pixels
+// The Mystery Box (assets/box-prizes.png, built by tools/build-box.py). Frames:
+// 0 closed, 1 shaking, 2-6 the lid opening, 7-12 the open box with each prize above
+// it (sword, axe, hammer, scythe, blaster, Giant Sword). Drawn at half size on the
+// detail canvas, with the middle of the chest's bottom edge at (ox, oy).
+export const BOX_SHAKE = 1, BOX_OPEN = [2, 3, 4, 5, 6], BOX_PRIZES = [7, 8, 9, 10, 11, 12], BOX_GIANT = 12;
+const BOX_FW = 100;
+export const BOX_BODY = 27; // height of the chest's front panel, in sheet pixels
 const boxImg = new Image();
 boxImg.src = 'assets/box-prizes.png';
 export function boxSprite(frame) {

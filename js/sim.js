@@ -49,7 +49,7 @@ export const slashCooldown = (L) => SLASH_CD - 0.03 * ((L || 1) - 1);
 export const GIANT_TIME = 5;
 // Mystery Box: spend gold, it spins, and out comes the Giant Sword.
 export const BOX_COST = 30;
-export const BOX_SPIN = 2.2;     // seconds of spinning before the prize
+export const BOX_SPIN = 3;       // seconds from opening the box to the prize
 export const BOX_SWORD = 10;     // seconds of Giant Sword it gives
 export const BOX_CLAIM = 8;      // seconds the prize hovers (sinking) before it's gone
 export const GIANT_LEN = 9;      // absurdly long, in tiles
