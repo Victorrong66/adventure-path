@@ -295,8 +295,8 @@ export class Renderer {
     g.globalAlpha = 1;
   }
 
-  // The Mystery Box. Closed when idle. A spin shakes it and opens the lid, then flicks
-  // through every prize, slowing down until it lands on the Giant Sword. The prize then
+  // The Mystery Box. Closed when idle. A spin shakes it and opens the lid, then shows
+  // each prize once, in order, landing on the Giant Sword. The prize then
   // slowly sinks back into the box until it's taken, and the lid closes again.
   drawBox(it, view, time) {
     const g = this.g;
@@ -314,11 +314,9 @@ export class Renderer {
       if (t < 0.3) frame = Math.floor(t * 12) % 2 ? BOX_SHAKE : 0; // rattle
       else if (t < OPEN) frame = BOX_OPEN[Math.min(BOX_OPEN.length - 1, Math.floor((t - 0.3) / (OPEN - 0.3) * BOX_OPEN.length))];
       else {
-        const done = Math.min(1, (t - OPEN) / (BOX_SPIN - OPEN));
-        const n = BOX_PRIZES.length, steps = 16; // prizes shown over the spin, quick at first
-        const step = Math.floor(Math.pow(done, 0.55) * steps);
-        const last = BOX_PRIZES.indexOf(BOX_GIANT);
-        frame = done > 0.93 ? BOX_GIANT : BOX_PRIZES[(step + ((last - steps) % n + n)) % n];
+        // one frame per prize, in order, ending on the Giant Sword
+        const done = Math.min(0.999, (t - OPEN) / (BOX_SPIN - OPEN));
+        frame = BOX_PRIZES[Math.floor(done * BOX_PRIZES.length)];
       }
     } else if (bx) {
       frame = BOX_GIANT;
