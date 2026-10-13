@@ -26,7 +26,8 @@ export const SHOP = [
 export const MAX_LEVEL = 5;
 export const SLASH_CD = 0.35;
 export const PICK_TIME = 30; // seconds everyone gets to choose a level-up before one is picked for them
-export const SHOP_TIME = 45; // seconds someone can keep the shop (and the game) paused
+export const REBOOT_TIME = 4; // seconds a player card has to sit at the Reboot Van
+export const REVIVE_MODES = ['classic', 'van'];
 
 const ENEMY = {
   slime: { hp: 14, spd: 1.1, dmg: 8, r: 0.35, xp: 1, minWave: 1, weight: 10 },
@@ -100,6 +101,11 @@ export class Sim {
     this.onSave = null;
     this.paused = false;
     this.pickT = 0;
+    // How downed players come back: 'classic' (stand next to them) or 'van'
+    // (carry their player card to the Reboot Van).
+    const rules = save.rules || {};
+    this.rules = { revive: REVIVE_MODES.includes(rules.revive) ? rules.revive : 'classic' };
+    this.cards = new Map(); // downed player id -> { x, y, carrier, boot }
   }
 
   emit(e) { this.events.push(e); }
@@ -139,6 +145,8 @@ export class Sim {
     if (!p) return;
     this.storePlayer(p);
     this.players.delete(id);
+    this.cards.delete(id);
+    for (const c of this.cards.values()) if (c.carrier === id) this.dropCard(c, p);
     this.emit({ k: 'msg', m: `${p.name} left` });
   }
 
@@ -195,10 +203,6 @@ export class Sim {
       this.pick(p, v | 0);
     } else if (a === 'buy') {
       this.buy(p, v);
-    } else if (a === 'shop') {
-      // Shopping pauses the world for everyone (with a time limit).
-      p.shopping = !!v && !p.dead;
-      p.shopT = SHOP_TIME;
     } else if (a === 'attack') {
       this.slash(p, v);
     }
@@ -315,11 +319,21 @@ export class Sim {
     this.emit({ k: 'hurt', id: p.id });
     if (p.hp <= 0) {
       p.hp = 0; p.dead = true; p.reviveP = 0;
-      this.emit({ k: 'down', id: p.id, m: `${p.name} is down! Stand next to them to revive.` });
+      if (this.rules.revive === 'van') {
+        // Drop their player card; carried cards fall where they went down.
+        this.cards.set(p.id, { x: p.x, y: p.y, carrier: null, boot: 0 });
+        for (const c of this.cards.values()) if (c.carrier === p.id) this.dropCard(c, p);
+        this.emit({ k: 'down', id: p.id, m: `${p.name} is down! Grab their card and take it to the Reboot Van.` });
+      } else this.emit({ k: 'down', id: p.id, m: `${p.name} is down! Stand next to them to revive.` });
     }
   }
 
+  dropCard(c, at) {
+    c.carrier = null; c.boot = 0; c.x = at.x; c.y = at.y;
+  }
+
   revive(p, frac) {
+    this.cards.delete(p.id);
     p.dead = false; p.hp = Math.ceil(p.maxHp * frac); p.inv = 1.5; p.reviveP = 0;
     this.emit({ k: 'revive', id: p.id });
   }
@@ -460,22 +474,15 @@ export class Sim {
 
   update(dt) {
     const all = [...this.players.values()];
-    // Level-up time (and shopping): the whole world waits until every player has
-    // picked their upgrade and closed the shop.
+    // Level-up time: the whole world waits until every player has picked their upgrade.
+    // (The shop doesn't pause anything: only the shopper sees it.)
     const picking = all.filter((p) => p.choices.length);
-    const shopping = all.filter((p) => p.shopping);
-    if (picking.length || shopping.length) {
+    if (picking.length) {
       if (!this.paused) { this.paused = true; this.pickT = PICK_TIME; }
-      if (picking.length) {
-        this.pickT -= dt;
-        if (this.pickT <= 0) {
-          for (const p of picking) this.pick(p, (Math.random() * p.choices.length) | 0);
-          this.pickT = PICK_TIME;
-        }
-      } else this.pickT = PICK_TIME;
-      for (const p of shopping) {
-        p.shopT -= dt;
-        if (p.shopT <= 0) { p.shopping = false; this.emit({ k: 'msg', m: `${p.name}'s shopping time ran out` }); }
+      this.pickT -= dt;
+      if (this.pickT <= 0) {
+        for (const p of picking) this.pick(p, (Math.random() * p.choices.length) | 0);
+        this.pickT = PICK_TIME;
       }
       return;
     }
@@ -507,6 +514,7 @@ export class Sim {
     this.updateEnemies(dt, alive);
     this.updateProjectiles(dt, alive);
     this.updatePickups(dt, alive);
+    if (this.cards.size) this.updateCards(dt, alive);
 
     if (this.enemies.some((e) => e.dead)) this.enemies = this.enemies.filter((e) => !e.dead);
     if (this.phase === 'wave' && this.spawnLeft === 0 && this.enemies.length === 0) this.waveCleared();
@@ -518,6 +526,7 @@ export class Sim {
     for (const p of all) {
       p.inv = Math.max(0, p.inv - dt);
       if (p.dead) {
+        if (this.rules.revive === 'van') continue; // they come back at the Reboot Van instead
         const helper = alive.find((o) => Math.hypot(o.x - p.x, o.y - p.y) < 1.4);
         if (helper) {
           p.reviveP += dt / 3;
@@ -696,6 +705,34 @@ export class Sim {
     this.projs = this.projs.filter((q) => q.life > 0);
   }
 
+  // Reboot Van: touch a downed player's card to pick it up, carry it to the van and
+  // stay there while it reboots them. A carrier who goes down drops what they carry.
+  updateCards(dt, alive) {
+    const van = this.world.van;
+    for (const [id, c] of this.cards) {
+      const p = this.players.get(id);
+      if (!p || !p.dead) { this.cards.delete(id); continue; }
+      let carrier = c.carrier && this.players.get(c.carrier);
+      if (c.carrier && (!carrier || carrier.dead)) { this.dropCard(c, carrier || c); carrier = null; }
+      if (!carrier) {
+        const taker = alive.find((o) => Math.hypot(o.x - c.x, o.y - c.y) < 0.7);
+        if (!taker) continue;
+        c.carrier = taker.id; carrier = taker;
+        this.emit({ k: 'card', id: taker.id, m: `${taker.name} picked up ${p.name}'s card` });
+      }
+      c.x = carrier.x; c.y = carrier.y;
+      if (Math.hypot(carrier.x - van.x, carrier.y - van.y) < 2) {
+        c.boot += dt / REBOOT_TIME;
+        if (c.boot >= 1) {
+          this.revive(p, 0.5);
+          const a = Math.random() * Math.PI * 2;
+          this.teleport(p, van.x + Math.cos(a) * 0.9, van.y + 0.8 + Math.abs(Math.sin(a)) * 0.4);
+          this.emit({ k: 'msg', m: `${carrier.name} rebooted ${p.name}!` });
+        }
+      } else c.boot = Math.max(0, c.boot - dt / 2);
+    }
+  }
+
   updatePickups(dt, alive) {
     let changed = false;
     for (const k of this.pickups) {
@@ -742,21 +779,18 @@ export class Sim {
       en: this.enemies.map((e) => [e.id, ENEMY_TYPES.indexOf(e.type), ri(e.x), ri(e.y), e.dir, e.flash > 0 ? 1 : 0, Math.max(0, Math.ceil(e.hp)), e.maxHp]),
       pr: this.projs.map((q) => [q.id, PROJ_KINDS.indexOf(q.kind), ri(q.x), ri(q.y), ri(q.vx), ri(q.vy)]),
       pk: this.pickups.map((k) => [k.id, PICKUP_KINDS.indexOf(k.kind), ri(k.x), ri(k.y)]),
+      rv: this.rules.revive,
+      cd: [...this.cards].map(([id, c]) => [id, ri(c.x), ri(c.y), c.carrier || 0, Math.round(c.boot * 100)]),
     };
   }
 
   // Who we're waiting on while paused (null when not paused): n = picking a
-  // level-up (auto-pick in t seconds), s = shopping (shop closes in st seconds).
+  // level-up (auto-pick in t seconds).
   pauseInfo() {
     if (!this.paused) return null;
-    const all = [...this.players.values()];
-    const n = all.filter((p) => p.choices.length).map((p) => p.name);
-    const shoppers = all.filter((p) => p.shopping);
-    if (!n.length && !shoppers.length) return null;
-    return {
-      n, t: Math.max(0, Math.ceil(this.pickT)),
-      s: shoppers.map((p) => p.name), st: Math.max(0, Math.ceil(Math.max(...shoppers.map((p) => p.shopT), 0))),
-    };
+    const n = [...this.players.values()].filter((p) => p.choices.length).map((p) => p.name);
+    if (!n.length) return null;
+    return { n, t: Math.max(0, Math.ceil(this.pickT)) };
   }
 
   privateView(id) {
@@ -765,7 +799,6 @@ export class Sim {
     return {
       lv: p.level, xp: p.xp, xn: p.xpNext, g: p.gold, ch: p.choices, w: p.weapons, ps: p.passives,
       pm: p.perm, spd: p.spd, tpn: p.tpn, hp: Math.ceil(p.hp), mhp: p.maxHp, dead: p.dead,
-      sh: !!p.shopping, sht: Math.ceil(p.shopT || 0),
     };
   }
 }

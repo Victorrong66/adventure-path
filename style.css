@@ -36,6 +36,7 @@ canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
 .btn.primary { background: #2c7c3c; }
 .btn.primary:hover { background: #38983c; }
 .btn.danger { background: #8c2030; }
+.btn.on { background: #2c7c3c; box-shadow: 0 0 0 3px var(--gold); }
 .btn.big { font-size: 14px; padding: 14px 18px; min-width: 260px; }
 .btn.tiny { padding: 6px 8px; font-size: 10px; }
 .btn:disabled { opacity: .45; cursor: default; }

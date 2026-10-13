@@ -86,7 +86,7 @@ export class Room extends DurableObject {
     if (!this.sim) {
       // Nobody is hosting this code right now: only the host (who brings the save) can open it.
       if (!d.host || !validSave(d.host.save)) return this.reject(conn, 'nohost');
-      this.open(d.host.save, pid, d.host.face);
+      this.open(d.host.save, pid, d.host.face, d.host.rules);
     } else if (d.host && pid !== this.hostPid) {
       return this.reject(conn, 'taken');
     }
@@ -111,8 +111,9 @@ export class Room extends DurableObject {
     this.syncSave();
   }
 
-  open(save, hostPid, face) {
+  open(save, hostPid, face, rules) {
     save.code = this.code;
+    if (rules && typeof rules === 'object') save.rules = { revive: rules.revive === 'van' ? 'van' : 'classic' };
     this.hostPid = hostPid;
     this.face = validFace(face !== undefined ? face : save.mobFace);
     save.mobFace = this.face;

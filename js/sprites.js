@@ -550,3 +550,39 @@ export function drawShadow(g, x, y, w) {
     g.fillRect(Math.round(x - hw), Math.round(y - h / 2 + i), hw * 2, 1);
   }
 }
+
+// The Reboot Van: a little camper with a satellite dish. `on` lights it up while it
+// reboots someone. Feet (the wheels' ground line) at (ox, oy).
+const vanCache = new Map();
+export function vanSprite(on = false) {
+  const key = on ? 1 : 0;
+  if (vanCache.has(key)) return vanCache.get(key);
+  const W = 46, H = 36;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const r = (col, x, y, w, h) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+  const OUT = '#141018';
+  // satellite dish on the roof
+  r(OUT, 27, 2, 12, 7); r('#c8ccd8', 28, 3, 10, 5); r('#8c94a8', 28, 6, 10, 2);
+  r(OUT, 32, 9, 2, 4); r(on ? '#f8f070' : '#e84838', 32, 0, 2, 2);
+  // body
+  r(OUT, 2, 12, 42, 18);
+  r('#e6e0cc', 3, 13, 40, 9);          // cream top
+  r('#3a6ec0', 3, 22, 40, 7);          // blue skirt
+  r('#2a508c', 3, 27, 40, 2);
+  r('#f8d838', 3, 21, 40, 1);          // stripe
+  // cab (front, on the right) with a sloped windscreen
+  r(OUT, 36, 13, 8, 1); r('#a8e8ff', 37, 14, 6, 6); r('#78b8d8', 37, 18, 6, 2);
+  // side windows
+  for (const wx of [6, 15, 24]) { r(OUT, wx - 1, 14, 9, 6); r(on ? '#f8f8b0' : '#58789c', wx, 15, 7, 4); r(on ? '#ffffff' : '#7898bc', wx, 15, 2, 1); }
+  // door handle, headlight, bumper
+  r('#8c94a8', 32, 23, 3, 1);
+  r(on ? '#ffffff' : '#f8e888', 42, 23, 2, 2);
+  r('#8c94a8', 2, 29, 42, 1);
+  // wheels
+  for (const wx of [9, 33]) { r(OUT, wx - 4, 27, 9, 8); r('#383040', wx - 3, 28, 7, 6); r('#b8b8c8', wx - 1, 30, 3, 2); }
+  const s = { img: c, ox: 23, oy: 34 };
+  vanCache.set(key, s);
+  return s;
+}

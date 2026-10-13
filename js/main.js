@@ -11,7 +11,7 @@ import {
   processFacePhoto, setMobFace, monsterSprite,
 } from './sprites.js';
 import {
-  loadMobFace, saveMobFace,
+  loadMobFace, saveMobFace, loadRules, saveRules,
   loadProfile, saveProfile, listWorlds, getWorld, storeWorld, deleteWorld, exportWorld, importWorld,
 } from './save.js';
 import { escapeHtml } from './util.js';
@@ -76,6 +76,12 @@ async function refreshSettings() {
   $('set-face-clear').classList.toggle('hidden', !face);
   $('set-face-demo').classList.toggle('hidden', !face);
   $('set-mute').textContent = audio.muted ? 'Sound: Off' : 'Sound: On';
+  const van = loadRules().revive === 'van';
+  $('set-revive-classic').classList.toggle('on', !van);
+  $('set-revive-van').classList.toggle('on', van);
+  $('set-revive-desc').textContent = van
+    ? 'A downed player drops their player card. Grab it, carry it to the Reboot Van by the campfire and wait there to bring them back.'
+    : 'Stand next to a downed player for a few seconds to revive them.';
   if (!face) return;
   $('set-face-preview').src = face;
   // Show what the monsters will look like
@@ -112,6 +118,13 @@ $('set-face-clear').addEventListener('click', () => {
   refreshSettings();
 });
 $('set-mute').addEventListener('click', () => { audio.toggleMute(); refreshSettings(); });
+for (const mode of ['classic', 'van']) {
+  $('set-revive-' + mode).addEventListener('click', () => {
+    saveRules({ ...loadRules(), revive: mode });
+    $('settings-status').textContent = 'Saved! This applies the next time you host a world.';
+    refreshSettings();
+  });
+}
 
 // ------------------------------------------------------------------ title background
 // The menus sit on top of a live view of a demo world.

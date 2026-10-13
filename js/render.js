@@ -5,7 +5,7 @@ import { TILE } from './util.js';
 import { MAP, O } from './world.js';
 import {
   charSprite, monsterSprite, monsterFrames, propSprite, smallSprite, giantSwordSprite,
-  drawText, textWidth, drawShadow, MERCHANT_LOOK,
+  drawText, textWidth, drawShadow, MERCHANT_LOOK, vanSprite,
 } from './sprites.js';
 import { paintGround, sceneSprite, TALL } from './scenery.js';
 import { bladePositions, auraRadius, giantAngle, GIANT_LEN } from './sim.js';
@@ -121,6 +121,10 @@ export class Renderer {
       }
     }
     items.push({ d: world.merchant.y, k: 'merchant', x: world.merchant.x, y: world.merchant.y });
+    const cards = view.cards || [];
+    const booting = cards.reduce((m, c) => Math.max(m, c.carrier ? c.boot : 0), 0);
+    if (view.van) items.push({ d: world.van.y, k: 'van', x: world.van.x, y: world.van.y, on: booting > 0 });
+    for (const c of cards) if (!c.carrier) items.push({ d: c.y + 0.05, k: 'card', e: c });
     for (const k of pickups) if (inView(k.x, k.y)) items.push({ d: k.y - 0.3, k: 'pickup', e: k });
     for (const e of enemies) if (inView(e.x, e.y)) items.push({ d: e.y, k: 'enemy', e });
     for (const p of players) items.push({ d: p.y, k: 'player', e: p });
@@ -135,6 +139,19 @@ export class Renderer {
       switch (it.k) {
         case 'obj': this.drawObj(it, time, players, enemies); break;
         case 'merchant': this.drawMerchant(it, time); break;
+        case 'van': {
+          const s = vanSprite(it.on && Math.floor(time * 6) % 2 === 0);
+          const x = this.sx(it.x, it.y), y = this.sy(it.x, it.y);
+          drawShadow(g, x, y, 44);
+          g.drawImage(s.img, x - s.ox, y - s.oy);
+          break;
+        }
+        case 'card': {
+          const x = this.sx(it.e.x, it.e.y), y = this.sy(it.e.x, it.e.y);
+          drawShadow(g, x, y + 2, 8);
+          this.drawCard(it.e, x, y - 10 + Math.round(Math.sin(time * 4) * 1.5), time);
+          break;
+        }
         case 'pickup': {
           const s = smallSprite(it.e.kind);
           const bob = Math.round(Math.sin(time * 5 + it.e.id) * 1);
@@ -163,6 +180,24 @@ export class Renderer {
     // Shop sign floats above the stall's awning
     const m = world.merchant;
     drawText(g, 'SHOP', this.sx(m.x) - 7, this.sy(m.x, m.y) - 40 + Math.round(Math.sin(time * 3)), '#f8d838');
+    if (view.van) {
+      const v = world.van, vx = this.sx(v.x), vy = this.sy(v.x, v.y);
+      const label = 'REBOOT VAN';
+      drawText(g, label, vx - (textWidth(label) >> 1), vy - 46 + Math.round(Math.sin(time * 3 + 1)), '#a8e8ff');
+      if (booting > 0) {
+        // beam of light while someone reboots
+        g.fillStyle = `rgba(168,232,255,${0.18 + 0.1 * Math.sin(time * 12)})`;
+        g.fillRect(vx - 6, vy - 120, 12, 120 - 36);
+        g.fillStyle = '#202030'; g.fillRect(vx - 16, vy - 39, 32, 4);
+        g.fillStyle = '#a8e8ff'; g.fillRect(vx - 15, vy - 38, Math.round(30 * Math.min(1, booting)), 2);
+      }
+    }
+    // Cards being carried float over their carrier's head
+    for (const c of cards) {
+      if (!c.carrier) continue;
+      const x = this.sx(c.x, c.y), y = this.sy(c.x, c.y);
+      this.drawCard(c, x, y - 52 + Math.round(Math.sin(time * 4) * 1.5), time);
+    }
     this.drawNames(players, view);
     this.drawOffscreenAllies(players, me);
     if (view.phase === 'wave' && enemies.length <= 5) this.drawOffscreenEnemies(enemies);
@@ -237,6 +272,26 @@ export class Renderer {
     g.globalAlpha = alpha;
     g.drawImage(s.img, x - s.ox, y - s.oy);
     g.globalAlpha = 1;
+  }
+
+  // A downed player's card: a little framed portrait of them.
+  drawCard(c, x, y, time) {
+    const g = this.g;
+    const w = 11, h = 13, l = x - (w >> 1), t = y - h;
+    const glow = 0.25 + 0.2 * Math.sin(time * 6);
+    g.fillStyle = `rgba(168,232,255,${glow})`; g.fillRect(l - 2, t - 2, w + 4, h + 4);
+    g.fillStyle = '#141018'; g.fillRect(l - 1, t - 1, w + 2, h + 2);
+    g.fillStyle = '#e6e0cc'; g.fillRect(l, t, w, h);
+    g.fillStyle = '#3a6ec0'; g.fillRect(l + 1, t + 1, w - 2, h - 4);
+    // their head and shoulders, from the front-facing sprite
+    const s = charSprite(c.look, 0, 0, 'idle');
+    const sh = Math.round(s.img.height * 0.42);
+    const dw = w - 2, dh = Math.round(dw * sh / s.img.width);
+    g.save();
+    g.beginPath(); g.rect(l + 1, t + 1, w - 2, h - 4); g.clip();
+    g.drawImage(s.img, 0, 0, s.img.width, sh, l + 1, t + 1, dw, dh);
+    g.restore();
+    g.fillStyle = '#f8d838'; g.fillRect(l + 2, t + h - 2, w - 4, 1);
   }
 
   drawMerchant(it, time) {

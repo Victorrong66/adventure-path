@@ -37,6 +37,15 @@ export function saveMobFace(face) {
   try { localStorage.setItem(FACE_KEY, face || 'none'); } catch { /* ignore */ }
 }
 
+// Host game rules (Settings). revive: 'classic' = stand next to a downed friend,
+// 'van' = carry their player card to the Reboot Van.
+const RULES_KEY = 'vw.rules';
+export function loadRules() {
+  const r = read(RULES_KEY, {});
+  return { revive: r.revive === 'van' ? 'van' : 'classic' };
+}
+export function saveRules(r) { write(RULES_KEY, r); }
+
 export function listWorlds() {
   const all = read(WORLDS_KEY, {});
   return Object.values(all).sort((a, b) => (b.updated || 0) - (a.updated || 0));

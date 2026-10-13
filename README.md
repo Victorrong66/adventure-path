@@ -17,8 +17,11 @@ waves of monsters together.
   import it on another computer, so someone else can take over hosting.
 - **Swarm combat:** auto-firing weapons, waves that get harder, an Ogre King boss every 5 waves
   (beating it saves a checkpoint), level-up upgrades (the game pauses until everyone has picked), reviving downed friends, and a merchant
-  at camp who sells permanent upgrades for gold (shopping pauses the game for everyone, for up to
-  45 seconds).
+  at camp who sells permanent upgrades for gold (the shop is private: the game keeps going for
+  everyone else).
+- **Reviving:** in **Settings**, the host picks how downed friends come back: *Revive in Place*
+  (stand next to them for 3 seconds) or *Reboot Van* (grab the player card they drop, carry it to
+  the van by the campfire and stay there 4 seconds; if you go down while carrying it, it drops).
 - **Monster Face Photo:** pick any photo in **Settings** on the title screen (or the host's pause
   menu). It's shrunk into a
   tiny pixel-art face and every monster wears it (with slime goo, bat wings, imp horns, a boss

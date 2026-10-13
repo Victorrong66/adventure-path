@@ -4,7 +4,7 @@
 import { WEAPONS, PASSIVES, SHOP, slashCooldown, ENEMY_TYPES, PROJ_KINDS, PICKUP_KINDS } from './sim.js';
 import { World } from './world.js';
 import { screenToWorldDir, facingFromScreen, escapeHtml } from './util.js';
-import { storeWorld, loadMobFace, saveMobFace } from './save.js';
+import { storeWorld, loadMobFace, saveMobFace, loadRules } from './save.js';
 import { setMobFace, processFacePhoto } from './sprites.js';
 import { JOIN_ERRORS } from './net.js';
 
@@ -72,7 +72,7 @@ export class Game {
       conn.on('close', () => { clearTimeout(timer); reject(new Error('Connection closed.')); this.disconnected(); });
       conn.send({
         t: 'hello', pid: this.profile.pid, name: this.profile.name, look: this.profile.look,
-        host: hostSave ? { save: hostSave, face } : undefined,
+        host: hostSave ? { save: hostSave, face, rules: loadRules() } : undefined,
       });
     });
     this.begin();
@@ -306,7 +306,7 @@ export class Game {
     this.dashT = Math.max(0, this.dashT - dt);
     const typing = document.activeElement === $('chat-input');
     if (stats.dead || this.pauseInfo()) { me.mv = false; me.dash = false; return; }
-    const [ux, uy] = typing || this.shopOpen ? [0, 0] : this.input.move();
+    const [ux, uy] = typing ? [0, 0] : this.input.move(); // walking away from the stall closes the shop
     const wantDash = !typing && this.input.dash();
     let [wx, wy] = screenToWorldDir(ux, uy);
     if (wx || wy) this.lastMove = [wx, wy];
@@ -367,7 +367,16 @@ export class Game {
     const time = this.serverT + (performance.now() - (this.serverTAt || performance.now())) / 1000;
     const phase = this.state.ph;
     const me = players.find((p) => p.id === this.myId) || null;
-    return { world: this.world, players, enemies, projs, pickups, me, meId: this.myId, time, phase };
+    // Reboot Van mode: downed players' cards (on the ground, or carried by a friend)
+    const van = this.state.rv === 'van';
+    const cards = [];
+    for (const [id, x, y, carrier, boot] of (van && this.state.cd) || []) {
+      const r = this.roster.get(id);
+      if (!r) continue;
+      const by = carrier && players.find((p) => p.id === carrier);
+      cards.push({ id, look: r.look, x: by ? by.x : x / 100, y: by ? by.y : y / 100, carrier: by ? carrier : 0, boot: boot / 100 });
+    }
+    return { world: this.world, players, enemies, projs, pickups, me, meId: this.myId, time, phase, van, cards };
   }
 
   // ---------------------------------------------------------------- events & UI
@@ -387,6 +396,7 @@ export class Game {
       case 'down': this.audio.sfx('down'); this.chatLine(null, e.m); break;
       case 'revive': if (mine) this.audio.sfx('revive'); break;
       case 'msg': this.chatLine(null, e.m); break;
+      case 'card': if (mine) this.audio.sfx('pick'); this.chatLine(null, e.m); break;
       case 'giant':
         this.audio.sfx('giant');
         if (mine) this.announce('GIANT SWORD!', 'Spin to win!');
@@ -499,16 +509,14 @@ export class Game {
     $('menu-mute').textContent = m ? 'Unmute' : 'Mute';
   }
 
-  // Opening the shop pauses the game for everyone (the server keeps a time limit).
-  toggleShop(open, tellServer = true) {
+  // The shop is private: only you see it, and the game keeps going for everyone.
+  toggleShop(open) {
     if (open && !this.nearMerchant()) return;
     if (open === this.shopOpen) return;
     if (open && this.myStats() && this.myStats().dead) return;
     this.shopOpen = open;
-    this.shopAt = performance.now();
     $('shop').classList.toggle('hidden', !open);
     this.lastShopKey = '';
-    if (tellServer) this.act('shop', open);
   }
 
   bindUi() {
@@ -604,7 +612,12 @@ export class Game {
     if (phase === 'camp') phaseText = `At camp. Press R when ready (${readyCount}/${players.length})`;
     else if (phase === 'rest') phaseText = `Next wave in ${pt}...`;
     else phaseText = `${left} monsters left`;
-    if (st.dead) phaseText = 'You are down! A friend can revive you.';
+    const van = this.state.rv === 'van';
+    if (st.dead) phaseText = van ? 'You are down! A friend can take your card to the Reboot Van.' : 'You are down! A friend can revive you.';
+    else if (van) {
+      const carrying = (this.state.cd || []).filter((c) => c[3] === this.myId).length;
+      if (carrying) phaseText = `Carrying ${carrying > 1 ? carrying + ' cards' : 'a card'}: bring it to the Reboot Van!`;
+    }
     $('hud-phase').textContent = phaseText;
 
     const me = view.me;
@@ -613,9 +626,7 @@ export class Game {
     readyBtn.classList.toggle('hidden', phase !== 'camp');
     readyBtn.textContent = meReady ? 'Not Ready (R)' : 'Ready (R)';
     $('act-shop').classList.toggle('hidden', !this.nearMerchant());
-    if (this.shopOpen && !this.nearMerchant()) this.toggleShop(false);
-    // The server closed our shop (time ran out)
-    if (this.shopOpen && !st.sh && performance.now() - this.shopAt > 1500) this.toggleShop(false, false);
+    if (this.shopOpen && (!this.nearMerchant() || st.dead)) this.toggleShop(false);
 
     const boss = view.enemies.find((e) => e.boss);
     $('boss-bar').classList.toggle('hidden', !boss);
@@ -632,10 +643,11 @@ export class Game {
     // Level-up: the game is paused for everyone until every player has picked.
     const ch = st.ch || [];
     const pz = this.pauseInfo();
-    const key = JSON.stringify([ch, pz, this.shopOpen]);
+    const key = JSON.stringify([ch, pz]);
     if (key !== this.lastChoicesKey) {
       this.lastChoicesKey = key;
-      const show = ch.length > 0 || (!!pz && !this.shopOpen);
+      const show = ch.length > 0 || !!pz;
+      if (show && this.shopOpen) this.toggleShop(false);
       $('choices').classList.toggle('hidden', !show);
       $('choices').classList.toggle('waiting', !ch.length);
       $('choices-title').textContent = ch.length ? 'LEVEL UP! Pick an upgrade' : 'PAUSED';
@@ -648,15 +660,10 @@ export class Game {
       if (pz) {
         const me = this.profile.name;
         const pickers = pz.n.filter((n) => !(ch.length && n === me));
-        const shoppers = (pz.s || []).filter((n) => !(this.shopOpen && n === me));
-        const parts = [];
-        if (pickers.length) parts.push(`${pickers.join(', ')} to pick an upgrade`);
-        if (shoppers.length) parts.push(`${shoppers.join(', ')} to finish shopping`);
-        if (!ch.length) wait = `Waiting for ${parts.join(' and ')}...`;
-        else if (parts.length) wait = `The game is paused until everyone is done. Also waiting for ${parts.join(' and ')}.`;
+        if (!ch.length) wait = `Waiting for ${pickers.join(', ')} to pick an upgrade...`;
+        else if (pickers.length) wait = `The game is paused until everyone picks. Also waiting for ${pickers.join(', ')}.`;
         else wait = 'The game is paused until you pick.';
-        if (pz.n.length) wait += ` (auto-pick in ${pz.t}s)`;
-        else if (shoppers.length) wait += ` (shop closes in ${pz.st}s)`;
+        wait += ` (auto-pick in ${pz.t}s)`;
       }
       $('choices-wait').textContent = wait;
       if (show && this.chatOpen) this.toggleChat(false);
@@ -664,7 +671,7 @@ export class Game {
 
     // Shop
     if (this.shopOpen) {
-      $('shop-timer').textContent = st.sh ? `The game is paused while you shop (${st.sht}s left)` : '';
+      $('shop-timer').textContent = phase === 'wave' ? 'Careful: monsters keep moving while you shop!' : '';
       const sk = JSON.stringify([st.g, st.pm]);
       if (sk !== this.lastShopKey) {
         this.lastShopKey = sk;
