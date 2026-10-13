@@ -240,7 +240,8 @@ cut_sheet('tools/hero-anim.png', ANIM)
 # tools/hero-side.png: smoother 9-frame side runs, drawn both ways (they replace the
 # side runs from hero-anim.png)
 cut_sheet('tools/hero-side.png', {'side': ((0, 80, 2172, 310), 9, 9), 'sideL': ((0, 428, 2172, 640), 9, 9)})
-run_scale = {n: 32 / (sum(f.height for f in run_frames[n]) / len(run_frames[n])) for n in ('side', 'sideL')}
+# (its hero is drawn with a bigger head: 27px tall frames match the other animations' head size)
+run_scale = {n: 27 / (sum(f.height for f in run_frames[n]) / len(run_frames[n])) for n in ('side', 'sideL')}
 k_run = 34 / (sum(f.height for f in run_frames['front']) / len(run_frames['front']))
 
 # Bottom row: a 3-frame swing to the right (mirrored for the left), knocked dizzy,
