@@ -243,6 +243,9 @@ def cut_sheet(path, anims):
             run_frames[name].append(cell.crop(cell.getbbox()))
 
 cut_sheet('tools/hero-anim.png', ANIM)
+# The sheet's Run (Side - Right) row barely moves its legs (it slides), so running right
+# uses the Run (Side - Left) frames mirrored, which have a proper stride.
+run_frames['side'] = [f.transpose(Image.FLIP_LEFT_RIGHT) for f in run_frames['sideL']]
 run_scale = {}  # per-animation scale overrides (none at the moment)
 k_run = 34 / (sum(f.height for f in run_frames['front']) / len(run_frames['front']))
 
