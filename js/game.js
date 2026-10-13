@@ -138,6 +138,7 @@ export class Game {
   applySnapshot(s) {
     this.lastSnapAt = performance.now();
     this.state = s;
+    if (s.rv === 'van') this.world.parkVan(); // you can't walk through the Reboot Van
     this.serverT = s.T;
     this.serverTAt = performance.now();
     this.priv = s.me;

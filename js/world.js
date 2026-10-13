@@ -89,6 +89,16 @@ export class World {
     this.set(Math.floor(this.merchant.x), Math.floor(this.merchant.y), O.STALL);
   }
 
+  // Reboot Van mode: the van is solid. Its body covers about 4x2 tiles on the ground
+  // (the invisible PART tiles block movement; the van itself is drawn by the renderer).
+  parkVan() {
+    if (this.vanParked) return;
+    this.vanParked = true;
+    const x0 = Math.floor(this.van.x - 1.9), x1 = Math.floor(this.van.x + 1.7);
+    const y0 = Math.floor(this.van.y - 1.4), y1 = Math.floor(this.van.y - 0.1);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) this.set(x, y, O.PART);
+  }
+
   inMap(x, y) { return x >= 0 && y >= 0 && x < MAP && y < MAP; }
   groundAt(x, y) { return this.inMap(x, y) ? this.ground[y * MAP + x] : T.GRASS; }
   set(x, y, o) { this.obj[y * MAP + x] = o; }

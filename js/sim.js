@@ -126,6 +126,7 @@ export class Sim {
     const rules = save.rules || {};
     this.rules = { revive: REVIVE_MODES.includes(rules.revive) ? rules.revive : 'classic' };
     this.cards = new Map(); // downed player id -> { x, y, carrier, boot }
+    if (this.rules.revive === 'van') this.world.parkVan();
     // Mystery Box: who spun it, 'spin' (spinning) or 'ready' (prize waiting to be
     // taken, sinking back into the box), and seconds left in that stage.
     this.box = { user: null, stage: '', t: 0 };
@@ -930,7 +931,7 @@ export class Sim {
         this.emit({ k: 'card', id: taker.id, m: `${taker.name} picked up ${p.name}'s card` });
       }
       c.x = carrier.x; c.y = carrier.y;
-      if (Math.hypot(carrier.x - van.x, carrier.y - van.y) < 2.2) {
+      if (Math.hypot(carrier.x - van.x, carrier.y - van.y) < 2.8) { // reachable from any side of the (solid) van
         c.atVan = true; c.carrier = null; c.boot = 0; c.x = van.x; c.y = van.y;
         this.emit({ k: 'card', id: carrier.id, m: `${carrier.name} dropped ${p.name}'s card at the van. Rebooting...` });
       }
