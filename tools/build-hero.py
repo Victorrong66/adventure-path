@@ -43,8 +43,6 @@ F = {
            (755,377,881,539),(883,378,1013,540),(1016,378,1143,540),(1146,377,1275,539)],
  'idleB': [(338,554,439,716)], '_back':  [(338,554,439,716),(462,554,568,716),(604,554,703,717),(736,555,837,715),(867,555,967,717)],
  'hurt':  [(62,1060,187,1181)],
- 'down':  [(493,1097,656,1178)],
- 'win':   [(1133,1027,1241,1183)],
 }
 K = 0.2
 ROLE = {'keep': 255, 'cloak': 254, 'hair': 253, 'skin': 252, 'tunic': 251}
@@ -148,7 +146,26 @@ for name, y0, y1 in RUN_ROWS:
         run_frames[name].append(cell.crop(cell.getbbox()))
 k_run = 34 / (sum(f.height for f in run_frames['front']) / len(run_frames['front']))
 run_frames['sideL'] = [f.transpose(Image.FLIP_LEFT_RIGHT) for f in run_frames['side']]
-for name in ('front', 'side', 'sideL', 'back'):
+# Bottom row: a 3-frame swing to the right (mirrored for the left), knocked dizzy,
+# lying knocked out, and the victory pose.
+band = run.crop((0, 745, RW, RH)); bp = band.load()
+heroes = []
+for comp, mx, my in sorted(components(band, 120), key=lambda c: c[1]):
+    xs = [x for x, _ in comp]
+    if heroes and min(xs) < heroes[-1]['x1'] + 8: heroes[-1]['px'] += comp; heroes[-1]['x1'] = max(heroes[-1]['x1'], max(xs))
+    else: heroes.append({'px': list(comp), 'x1': max(xs)})
+cells = []
+for hero in heroes:
+    cell = Image.new('RGBA', band.size); cp = cell.load()
+    for x, y in hero['px']: cp[x, y] = bp[x, y]
+    cells.append(cell.crop(cell.getbbox()))
+assert len(cells) == 6, f'expected 6 poses on the bottom row, found {len(cells)}'
+run_frames['atk'] = cells[0:3]
+run_frames['atkL'] = [f.transpose(Image.FLIP_LEFT_RIGHT) for f in cells[0:3]]
+run_frames['dizzy'] = [cells[3]]
+run_frames['down'] = [cells[4]]
+run_frames['win'] = [cells[5]]
+for name in ('front', 'side', 'sideL', 'back', 'atk', 'atkL', 'dizzy', 'down', 'win'):
     for cell in run_frames[name]:
         sm = cell.resize((max(1, round(cell.width * k_run)), max(1, round(cell.height * k_run))), Image.BOX)
         px = sm.load()
@@ -162,6 +179,7 @@ for name in ('front', 'side', 'sideL', 'back'):
 # each shape (body + raised sword, or a separate slash trail) belongs to the cell its centre is in
 swing_parts = components(swing, 400)
 for r, name in enumerate(SWING_ROWS):
+    if name in ('atk', 'atkL'): continue  # side swings come from the run sheet's bottom row
     for c in range(5):
         cx0, cy0, cx1, cy1 = c * SW / 5, r * SH / 4, (c + 1) * SW / 5, (r + 1) * SH / 4
         cell = Image.new('RGBA', swing.size, (0, 0, 0, 0)); cp = cell.load(); sp = swing.load()
@@ -182,7 +200,7 @@ for r, name in enumerate(SWING_ROWS):
 def anchor(f, name):
     if name == 'down': return f.width // 2
     px = f.load(); xs = []
-    rows = range(f.height - 3, f.height) if name.startswith('atk') else range(int(f.height * 0.25))
+    rows = range(f.height - 3, f.height) if name.startswith('atk') or name in ('win', 'dizzy') else range(int(f.height * 0.25))
     for y in rows:
         for x in range(f.width):
             if px[x, y][3]: xs.append(x)

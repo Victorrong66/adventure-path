@@ -13,6 +13,8 @@ import { bladePositions, auraRadius, giantAngle, GIANT_LEN, BOX_COST, BOX_SPIN, 
 const BG = '#0c1a10';
 const DETAIL = 2;
 const ATTACK_POSE = 0.42; // seconds a sword swing lasts (wind-up, slash, follow-through)
+const DIZZY_MS = 1200;    // a downed hero sees stars this long before lying flat
+const WIN_POSE_MS = 2000; // victory pose after a wave is cleared
 
 export class Renderer {
   constructor(canvas) {
@@ -25,6 +27,8 @@ export class Renderer {
     this.groundCache = null;
     this.attackAt = new Map(); // player id -> when they last swung (performance.now)
     this.trails = new Map();   // player id -> recent dash positions, for afterimages
+    this.downAt = new Map();   // player id -> when they went down (performance.now)
+    this.winUntil = 0;         // victory pose until this time (performance.now)
     this.resize();
     addEventListener('resize', () => this.resize());
   }
@@ -73,6 +77,7 @@ export class Renderer {
         break;
       }
       case 'lvl': this.addFx({ t: 'lvl', id: e.id, life: 1.2 }); break;
+      case 'clear': this.winUntil = performance.now() + WIN_POSE_MS; break; // everyone strikes the victory pose
       case 'quake': this.addFx({ t: 'quake', x: e.x, y: e.y, r: e.r, life: 0.35 }); this.shake = Math.max(this.shake, 0.12); break;
     }
   }
@@ -394,9 +399,11 @@ export class Renderer {
   drawPlayer(p, view, time) {
     const g = this.g;
     const x = this.sx(p.x, p.y), y = this.sy(p.x, p.y);
+    const now = performance.now();
     if (p.dead) {
-      // knocked out on the ground, waiting for a friend to revive them
-      const ds = charSprite(p.look, p.dir, 0, 'down');
+      // knocked out: dizzy for a moment, then flat on the ground waiting for a friend
+      if (!this.downAt.has(p.id)) this.downAt.set(p.id, now);
+      const ds = charSprite(p.look, p.dir, 0, now - this.downAt.get(p.id) < DIZZY_MS ? 'dizzy' : 'down');
       drawShadow(g, x, y, 14);
       g.drawImage(ds.img, x - ds.ox, y - ds.oy, ds.w, ds.h);
       if (p.rv > 0) {
@@ -405,7 +412,7 @@ export class Renderer {
       }
       return;
     }
-    const now = performance.now();
+    this.downAt.delete(p.id);
     // Pose: sword strike, walking, or breathing in place
     let s;
     const since = now - (this.attackAt.get(p.id) || -1e9);
@@ -413,6 +420,7 @@ export class Renderer {
     let bob = 0;
     const cheer = this.fx.some((f) => f.t === 'lvl' && f.id === p.id);
     if (hit && since >= ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, 0, 'hurt');
+    else if (now < this.winUntil && since >= ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, 0, 'win'); // wave cleared!
     else if (cheer && !p.mv && since >= ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, 0, 'win'); // level up!
     else if (since < ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, since / (ATTACK_POSE * 1000), 'atk');
     else if (p.mv || p.dash) s = charSprite(p.look, p.dir, Math.floor(now / RUN_FRAME_MS));

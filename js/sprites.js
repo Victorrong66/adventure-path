@@ -90,7 +90,7 @@ export const RUN_FRAME_MS = 110; // how long each frame of the run cycle shows
 const NATIVE = {
   front: 'down', back: 'up', side: 'right', sideL: 'left',
   idleF: 'down', idleB: 'up', idleR: 'right', idleL: 'left',
-  atkF: 'down', atkB: 'up', atk: 'right', atkL: 'left', hurt: 'left', down: 'left', win: 'right',
+  atkF: 'down', atkB: 'up', atk: 'right', atkL: 'left', hurt: 'left', down: 'right', dizzy: 'down', win: 'down',
 };
 
 // Heroes (see hero.js). Returns { img, ox, oy, w, h, hurt() }: draw img at
