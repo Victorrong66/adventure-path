@@ -482,29 +482,13 @@ export function smallSprite(name) {
 }
 
 // The Giant Sword power-up: an absurdly long blade pointing right (handle at the left).
-let giantBlade = null;
+// The Giant Sword (assets/giant-sword.png, built by tools/build-sword.py): drawn at
+// half size on the detail canvas, stretched to `lengthPx` world pixels long.
+const swordImg = new Image();
+swordImg.src = 'assets/giant-sword.png';
 export function giantSwordSprite(lengthPx) {
-  if (giantBlade && giantBlade.width === lengthPx + 2) return giantBlade;
-  const W = lengthPx, H = 15, mid = 7;
-  const { c, g } = mk(W + 2, H);
-  const r = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x + 1, y, w, h); };
-  r(0, mid - 2, 9, 5, '#7c4c24'); r(0, mid - 2, 9, 1, '#a8743c');     // handle
-  for (let x = 1; x < 9; x += 3) r(x, mid - 2, 1, 5, '#5c3418');      // grip wrap
-  r(-1, mid - 2, 2, 5, '#f8d838');                                    // pommel
-  r(9, 1, 4, 13, '#f8d838'); r(9, 1, 4, 1, '#fff8a0'); r(12, 1, 1, 13, '#c09018'); // guard
-  r(10, mid, 2, 1, '#e83c4c');                                        // gem
-  const bladeEnd = W - 10;
-  r(13, mid - 3, bladeEnd - 13, 7, '#d8dcf0');                        // blade (7px wide)
-  r(13, mid - 3, bladeEnd - 13, 1, '#ffffff');
-  r(13, mid + 3, bladeEnd - 13, 1, '#8c90a8');
-  r(13, mid, bladeEnd - 16, 1, '#b0b4cc');                            // fuller
-  for (let x = 20; x < bladeEnd - 4; x += 24) r(x, mid - 2, 2, 1, '#ffffff'); // glints
-  for (let i = 0; i < 10; i++) {                                      // tapered tip
-    const h = Math.max(1, 7 - Math.round(i * 0.7));
-    r(bladeEnd + i, mid - Math.floor(h / 2), 1, h, i > 7 ? '#ffffff' : '#d8dcf0');
-  }
-  giantBlade = outline(c, '#1c1830');
-  return giantBlade;
+  if (!swordImg.complete || !swordImg.naturalWidth) return null;
+  return { img: swordImg, w: lengthPx, h: Math.round(swordImg.naturalHeight * lengthPx / swordImg.naturalWidth) };
 }
 
 // ---------------------------------------------------------------- pixel font (3x5)

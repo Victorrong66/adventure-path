@@ -233,17 +233,21 @@ export class Renderer {
         const top = by - 14 - Math.round(Math.min(1, done) * 26);
         g.drawImage(s.img, bx - s.img.width, top - s.img.height * 2, s.img.width * 2, s.img.height * 2);
       } else if (view.bx) {
-        // the prize hovers over the open box and slowly sinks back in if nobody takes it
+        // the prize hovers point-down over the open box and slowly sinks back in if
+        // nobody takes it
         const left = view.bx[1] / 10 / BOX_CLAIM;
-        const s = smallSprite('gsword');
-        const sw = s.img.width * 3, sh = s.img.height * 3;
-        const bottom = by - 14 - Math.round(left * 26) + Math.round(Math.sin(time * 4));
+        const sw = giantSwordSprite(46);
+        const tip = by - 8 - Math.round(left * 24) + Math.round(Math.sin(time * 4));
         g.fillStyle = `rgba(168,232,255,${0.12 + 0.08 * Math.sin(time * 8)})`;
-        g.fillRect(bx - 6, bottom - sh - 6, 12, sh + 6);
-        g.save();
-        g.beginPath(); g.rect(bx - 40, by - 120, 80, 120 - 14); g.clip(); // hide what's sunk into the box
-        g.drawImage(s.img, bx - sw / 2, bottom - sh, sw, sh);
-        g.restore();
+        g.fillRect(bx - 7, tip - 52, 14, 52);
+        if (sw) {
+          g.save();
+          g.beginPath(); g.rect(bx - 40, by - 140, 80, 140 - 14); g.clip(); // hide what's sunk into the box
+          g.translate(bx, tip - sw.w);
+          g.rotate(Math.PI / 2);
+          g.drawImage(sw.img, 0, -sw.h, sw.w, sw.h * 2); // drawn chunkier so it reads at this size
+          g.restore();
+        }
       }
     }
     // Cards being carried float over their carrier's head
@@ -275,7 +279,7 @@ export class Renderer {
     g.translate(cx, cy);
     g.rotate(a);
     // blink when it's about to run out
-    if (!(p.gs < 1.2 && Math.floor(time * 10) % 2)) g.drawImage(img, 2, -Math.floor(img.height / 2));
+    if (img && !(p.gs < 1.2 && Math.floor(time * 10) % 2)) g.drawImage(img.img, 0, -img.h / 2, img.w, img.h);
     g.restore();
   }
 
