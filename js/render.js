@@ -5,7 +5,7 @@ import { TILE } from './util.js';
 import { MAP, O } from './world.js';
 import {
   charSprite, monsterSprite, monsterFrames, propSprite, smallSprite, giantSwordSprite,
-  drawText, textWidth, drawShadow, MERCHANT_LOOK, vanSprite, boxSprite,
+  drawText, textWidth, drawShadow, MERCHANT_LOOK, vanSprite, boxSprite, BOX_FRAMES, BOX_CLOSED, BOX_GIANT, BOX_BODY,
 } from './sprites.js';
 import { paintGround, sceneSprite, TALL } from './scenery.js';
 import { bladePositions, auraRadius, giantAngle, GIANT_LEN, BOX_COST, BOX_SPIN, BOX_CLAIM } from './sim.js';
@@ -158,16 +158,7 @@ export class Renderer {
           }
           break;
         }
-        case 'box': {
-          const s = boxSprite(!!view.bx);
-          const x = this.sx(it.x, it.y), y = this.sy(it.x, it.y);
-          // soft blue glow on the ground
-          g.fillStyle = `rgba(120,232,255,${0.12 + 0.06 * Math.sin(time * 3)})`;
-          g.beginPath(); g.ellipse(x, y - 2, 18, 8, 0, 0, Math.PI * 2); g.fill();
-          drawShadow(g, x, y, 22);
-          g.drawImage(s.img, x - s.ox, y - s.oy, s.w, s.h);
-          break;
-        }
+        case 'box': this.drawBox(it, view, time); break;
         case 'card': {
           const x = this.sx(it.e.x, it.e.y), y = this.sy(it.e.x, it.e.y);
           drawShadow(g, x, y + 2, 8);
@@ -216,39 +207,11 @@ export class Renderer {
         g.fillStyle = '#a8e8ff'; g.fillRect(vx - 15, vy - 57, Math.round(30 * Math.min(1, booting)), 2);
       }
     }
-    // Mystery Box: its label, and while spinning, prizes flicker above it (slowing down)
-    // until the Giant Sword rises out.
+    // Mystery Box label
     {
       const b = world.box, bx = this.sx(b.x), by = this.sy(b.x, b.y);
       const label = view.bx ? 'MYSTERY BOX' : `MYSTERY BOX ${BOX_COST}G`;
-      drawText(g, label, bx - (textWidth(label) >> 1), by - 30 + Math.round(Math.sin(time * 3 + 2)), '#78e8ff');
-      if (view.bx && !view.bx[2]) {
-        // spinning: prizes flicker as they rise out of the box, slowing down
-        const done = 1 - view.bx[1] / 10 / BOX_SPIN;
-        g.fillStyle = `rgba(168,232,255,${0.2 + 0.1 * Math.sin(time * 14)})`;
-        g.fillRect(bx - 5, by - 60, 10, 46);
-        const kinds = ['heart', 'coin', 'xp3', 'bolt', 'gsword', 'xp2'];
-        const step = Math.floor(Math.pow(Math.max(0, done), 0.6) * 18);
-        const s = smallSprite(done > 0.85 ? 'gsword' : kinds[step % kinds.length]);
-        const top = by - 14 - Math.round(Math.min(1, done) * 26);
-        g.drawImage(s.img, bx - s.img.width, top - s.img.height * 2, s.img.width * 2, s.img.height * 2);
-      } else if (view.bx) {
-        // the prize hovers point-down over the open box and slowly sinks back in if
-        // nobody takes it
-        const left = view.bx[1] / 10 / BOX_CLAIM;
-        const sw = giantSwordSprite(46);
-        const tip = by - 8 - Math.round(left * 24) + Math.round(Math.sin(time * 4));
-        g.fillStyle = `rgba(168,232,255,${0.12 + 0.08 * Math.sin(time * 8)})`;
-        g.fillRect(bx - 7, tip - 52, 14, 52);
-        if (sw) {
-          g.save();
-          g.beginPath(); g.rect(bx - 40, by - 140, 80, 140 - 14); g.clip(); // hide what's sunk into the box
-          g.translate(bx, tip - sw.w);
-          g.rotate(Math.PI / 2);
-          g.drawImage(sw.img, 0, -sw.h, sw.w, sw.h * 2); // drawn chunkier so it reads at this size
-          g.restore();
-        }
-      }
+      drawText(g, label, bx - (textWidth(label) >> 1), by - (view.bx ? 74 : 30) + Math.round(Math.sin(time * 3 + 2)), '#f8d838');
     }
     // Cards being carried float over their carrier's head
     for (const c of cards) {
@@ -330,6 +293,42 @@ export class Renderer {
     g.globalAlpha = alpha;
     g.drawImage(s.img, x - s.ox, y - s.oy);
     g.globalAlpha = 1;
+  }
+
+  // The Mystery Box. Closed when idle; while spinning it flicks through every weapon,
+  // slowing down until it lands on the Giant Sword; then the prize slowly sinks back
+  // into the box until it's taken.
+  drawBox(it, view, time) {
+    const g = this.g;
+    const x = this.sx(it.x, it.y), y = this.sy(it.x, it.y);
+    g.fillStyle = `rgba(248,200,80,${0.10 + 0.05 * Math.sin(time * 3)})`;
+    g.beginPath(); g.ellipse(x, y - 2, 20, 8, 0, 0, Math.PI * 2); g.fill();
+    drawShadow(g, x, y, 26);
+    const bx = view.bx;
+    let frame = BOX_CLOSED, sink = 0;
+    if (bx && !bx[2]) {
+      const done = Math.min(1, 1 - bx[1] / 10 / BOX_SPIN);
+      const steps = 16; // frames shown over the whole spin, closer together at the start
+      const step = Math.floor(Math.pow(done, 0.55) * steps);
+      const offset = ((BOX_GIANT - steps) % BOX_FRAMES + BOX_FRAMES) % BOX_FRAMES; // so the last step is the Giant Sword
+      frame = done > 0.93 ? BOX_GIANT : (step + offset) % BOX_FRAMES;
+    } else if (bx) {
+      frame = BOX_GIANT;
+      sink = 1 - bx[1] / 10 / BOX_CLAIM; // 0 when it appears, 1 when it's gone
+    }
+    const s = boxSprite(frame);
+    if (!s) return;
+    const left = x - s.ox, top = y - s.oy;
+    if (!sink) { g.drawImage(s.img, s.sx, 0, s.sw, s.sh, left, top, s.w, s.h); return; }
+    // the chest stays put; everything above it (lid, glow, prize) sinks into it
+    const bodySh = BOX_BODY, bodyTop = s.sh - bodySh;
+    const cut = top + bodyTop / 2;
+    const drop = Math.round(sink * (bodyTop / 2 - 6));
+    g.save();
+    g.beginPath(); g.rect(left - 20, top - 40, s.w + 40, cut - top + 40); g.clip();
+    g.drawImage(s.img, s.sx, 0, s.sw, bodyTop, left, top + drop, s.w, bodyTop / 2);
+    g.restore();
+    g.drawImage(s.img, s.sx, bodyTop, s.sw, bodySh, left, cut, s.w, bodySh / 2);
   }
 
   // A downed player's card: a little framed portrait of them.
