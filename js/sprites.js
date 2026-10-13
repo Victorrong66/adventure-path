@@ -97,30 +97,26 @@ function fromTemplate(rows, pal, margin = 1, doOutline = true) {
 // ---------------------------------------------------------------- characters
 
 const charCache = new Map();
-export const RUN_FRAME_MS = 85; // how long each frame of the run cycle shows
+export const RUN_FRAME_MS = 75; // how long each frame of the walk cycle shows
 
 // Which way each sheet frame faces; anything else is mirrored to fit.
 const NATIVE = {
   front: 'down', back: 'up', side: 'right', sideL: 'left',
-  idleF: 'down', idleB: 'up', idleR: 'right', idleL: 'left', dash: 'right', dashL: 'left',
-  atkF: 'down', atkB: 'up', atk: 'right', atkL: 'left', hurt: 'left', down: 'right', dizzy: 'down', win: 'down',
+  atkF: 'down', atkB: 'up', atk: 'right', atkL: 'left', hurt: 'left', down: 'left', win: 'right',
 };
 
 // Heroes (see hero.js). Returns { img, ox, oy, w, h, hurt() }: draw img at
 // w x h at (footX - ox, footY - oy).
-// pose: 'walk' (frame = any running count; RUN_FRAME_MS per frame), 'dash' (frame 0..4), 'idle', 'atk' (frame = swing progress
+// pose: 'walk' (frame = any running count), 'idle', 'atk' (frame = swing progress
 // 0..1), 'hurt', 'down' or 'win'.
 export function charSprite(look, facing, frame = 0, pose = 'walk') {
   const left = facing === 3 || (facing === 1 && pose !== 'walk' && pose !== 'idle');
   let kind;
-  // running: a 4-frame run cycle per direction; standing: one still frame per direction
-  if (pose === 'walk') kind = facing === 0 ? 'front' : facing === 1 ? 'back' : left ? 'sideL' : 'side';
-  else if (pose === 'idle') kind = facing === 0 ? 'idleF' : facing === 1 ? 'idleB' : left ? 'idleL' : 'idleR';
-  else if (pose === 'atk') kind = ['atkF', 'atkB', 'atk', 'atkL'][facing] || 'atk'; // a swing for each direction
-  else if (pose === 'dash') kind = facing === 3 ? 'dashL' : 'dash'; // frame = which dash frame
+  if (pose === 'walk' || pose === 'idle') kind = facing === 0 ? 'front' : facing === 1 ? 'back' : left ? 'sideL' : 'side';
+  else if (pose === 'atk') kind = ['atkF', 'atkB', 'atk', 'atkL'][facing] || 'atk'; // a 5-frame swing for each direction
   else kind = pose;
   const n = heroFrameCount(kind);
-  const index = pose === 'idle' ? 0 : pose === 'atk' ? Math.min(n - 1, Math.floor(frame * n)) : pose === 'dash' ? Math.min(n - 1, frame) : ((frame % n) + n) % n;
+  const index = pose === 'idle' ? 0 : pose === 'atk' ? Math.min(n - 1, Math.floor(frame * n)) : ((frame % n) + n) % n;
   const native = NATIVE[kind];
   const flip = (native === 'left' || native === 'right') && native !== (left ? 'left' : 'right');
   const key = `${look.skin}${look.hairColor}${look.outfit}${look.outfitColor}|${kind}|${index}|${flip ? 1 : 0}`;
