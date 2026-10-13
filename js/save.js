@@ -51,7 +51,15 @@ export function listWorlds() {
   return Object.values(all).sort((a, b) => (b.updated || 0) - (a.updated || 0));
 }
 export function getWorld(id) { return read(WORLDS_KEY, {})[id] || null; }
+// The Test Arena has its own save, kept out of the world list.
+const ARENA_KEY = 'vw.arena';
+export function loadArena(make) {
+  const s = read(ARENA_KEY, null);
+  if (s && typeof s.seed === 'number') return s;
+  return { ...make('Test Arena'), arena: true };
+}
 export function storeWorld(save) {
+  if (save.arena) return write(ARENA_KEY, save);
   const all = read(WORLDS_KEY, {});
   all[save.id] = save;
   return write(WORLDS_KEY, all);

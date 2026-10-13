@@ -235,3 +235,9 @@ textarea {
 #act-box:disabled { box-shadow: 0 0 0 3px var(--edge); }
 #act-box.take { background: #2c7c3c; animation: box-pulse .6s ease-in-out infinite alternate; }
 @keyframes box-pulse { from { box-shadow: 0 0 0 3px #f8d838, 0 0 6px #f8d838; } to { box-shadow: 0 0 0 3px #f8d838, 0 0 18px #f8d838; } }
+
+/* Test Arena tools */
+.arena-panel { max-width: 560px; }
+.arena-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; margin: 10px 0; }
+.arena-row select { font: inherit; font-size: 10px; padding: 8px; background: var(--panel-2); color: inherit; border: 0; box-shadow: 0 0 0 3px var(--edge); }
+#act-arena { background: #6a3a9a; }

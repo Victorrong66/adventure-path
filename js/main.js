@@ -11,7 +11,7 @@ import {
   processFacePhoto, setMobFace, monsterSprite, RUN_FRAME_MS,
 } from './sprites.js';
 import {
-  loadMobFace, saveMobFace, loadRules, saveRules,
+  loadMobFace, saveMobFace, loadRules, saveRules, loadArena,
   loadProfile, saveProfile, listWorlds, getWorld, storeWorld, deleteWorld, exportWorld, importWorld,
 } from './save.js';
 import { escapeHtml } from './util.js';
@@ -65,6 +65,7 @@ function needCharacter(next) {
 $('btn-host').addEventListener('click', () => { if (needCharacter('host')) show('host'); });
 $('btn-join').addEventListener('click', () => { if (needCharacter('join')) { show('join'); $('join-code').focus(); } });
 $('btn-edit').addEventListener('click', () => { afterCharScreen = 'title'; show('char'); });
+$('btn-arena').addEventListener('click', () => { if (needCharacter('arena')) startArena(); });
 $('btn-settings').addEventListener('click', () => show('settings'));
 
 // ------------------------------------------------------------------ settings
@@ -80,7 +81,7 @@ async function refreshSettings() {
   $('set-revive-classic').classList.toggle('on', !van);
   $('set-revive-van').classList.toggle('on', van);
   $('set-revive-desc').textContent = van
-    ? 'A downed player drops their player card. Grab it and drop it off at the Reboot Van by the campfire; the van brings them back a few seconds later.'
+    ? 'A downed player drops their player card. Grab it, drop it off at the Reboot Van and stay by the van while it reboots them.'
     : 'Stand next to a downed player for a few seconds to revive them.';
   if (!face) return;
   $('set-face-preview').src = face;
@@ -209,6 +210,7 @@ $('char-done').addEventListener('click', () => {
   if (!name) { $('char-name').focus(); $('char-name').placeholder = 'Type a name!'; return; }
   profile = { ...profile, name, look: draft.look, created: true };
   saveProfile(profile);
+  if (afterCharScreen === 'arena') { show('title'); startArena(); return; }
   show(afterCharScreen);
   if (afterCharScreen === 'join') joinFromInvite();
 });
@@ -300,6 +302,18 @@ async function startHosting(save) {
   }
   if (err) { status.textContent = err.message; status.classList.add('err'); return; }
   showToast(`Room code: ${game.code} — share it with your friends!`, 5000);
+}
+
+// The Test Arena: a sandbox world (its own save, never in the world list). Friends
+// can join it with its room code like any world.
+async function startArena() {
+  audio.init();
+  const save = loadArena(newWorldSave);
+  if (!save.code) { save.code = makeCode(); storeWorld(save); }
+  let err = await tryJoin(save.code, save);
+  if (err && err.code === 'taken') { save.code = makeCode(); storeWorld(save); err = await tryJoin(save.code, save); }
+  if (err) { show('title'); showToast(err.message, 5000); return; }
+  showToast(`Test Arena! Press T (or Arena Tools) for tools. Room code: ${game.code}`, 6000);
 }
 
 // ------------------------------------------------------------------ joining

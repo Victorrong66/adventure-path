@@ -27,6 +27,7 @@
         <div class="col">
           <button id="btn-host" class="btn big">Host a World</button>
           <button id="btn-join" class="btn big">Join a Friend</button>
+          <button id="btn-arena" class="btn">Test Arena</button>
           <button id="btn-edit" class="btn">Edit Character</button>
         </div>
         <p class="hint">WASD / Arrows move &middot; J or click attack &middot; Space dash &middot; R ready &middot; E shop<br>1 2 3 pick upgrade &middot; Enter chat &middot; M mute &middot; Esc menu</p>
@@ -168,6 +169,7 @@
       <button id="act-ready" class="btn hidden">Ready (R)</button>
       <button id="act-shop" class="btn hidden">Shop (E)</button>
       <button id="act-box" class="btn hidden">Mystery Box (F)</button>
+      <button id="act-arena" class="btn hidden">Arena Tools (T)</button>
     </div>
     <div id="chat-panel" class="chat-panel hidden">
       <div class="chat-head"><b>Chat</b><button class="btn tiny" id="chat-close">Close</button></div>
@@ -191,6 +193,40 @@
     </div>
     <div class="stick-hint touch-only"><span>MOVE</span></div>
     <div id="stick" class="stick"><div id="knob" class="knob"></div></div>
+  </div>
+
+  <!-- Test Arena tools: only in the Test Arena -->
+  <div id="arena" class="modal hidden">
+    <div class="panel arena-panel">
+      <h2>Test Arena Tools</h2>
+      <p class="small">Try out monsters, weapons and the Reboot Van. Nothing here touches your real worlds.</p>
+      <div class="arena-row">
+        <select id="arena-mob"></select>
+        <button class="btn" data-arena="spawn1">Spawn 1</button>
+        <button class="btn" data-arena="spawn5">Spawn 5</button>
+      </div>
+      <div class="arena-row">
+        <button class="btn" data-arena="clear">Clear Monsters</button>
+        <span class="small">Monster level <b id="arena-wave">1</b></span>
+        <button class="btn tiny" data-arena="wave-">&minus;</button>
+        <button class="btn tiny" data-arena="wave+">+</button>
+      </div>
+      <div class="arena-row">
+        <select id="arena-power"></select>
+        <button class="btn" data-arena="power">Take Weapon</button>
+      </div>
+      <div class="arena-row">
+        <button class="btn" data-arena="gold">+100 Gold</button>
+        <button class="btn" data-arena="level">+1 Level</button>
+        <button class="btn" data-arena="heal">Heal</button>
+      </div>
+      <div class="arena-row">
+        <button class="btn" data-arena="god" id="arena-god">God Mode: Off</button>
+        <button class="btn" data-arena="down">Knock Me Down</button>
+        <button class="btn" data-arena="mode" id="arena-mode">Reviving: In Place</button>
+      </div>
+      <button class="btn" id="arena-close">Close</button>
+    </div>
   </div>
 
   <div id="shop" class="modal hidden">

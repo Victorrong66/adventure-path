@@ -23,8 +23,8 @@ waves of monsters together.
   party, catches up to the party's level and picks an upgrade for each level they missed.
 - **Reviving:** in **Settings**, the host picks how downed friends come back: *Revive in Place*
   (stand next to them for 3 seconds) or *Reboot Van* (grab the player card they drop, carry it to
-  the van by the campfire and drop it off; the van reboots them by itself a few seconds later, so
-  you can get straight back to fighting. If you go down while carrying a card, it drops).
+  the Reboot Van and drop it off, then stay by the van while it reboots them (walk away and the
+  reboot pauses where it was). If you go down while carrying a card, it drops).
 - **Monster Face Photo:** pick any photo in **Settings** on the title screen (or the host's pause
   menu). It's shrunk into a
   tiny pixel-art face and every monster wears it (with slime goo, bat wings, imp horns, a boss
@@ -40,6 +40,11 @@ waves of monsters together.
   monsters back, 12s), **Reaper Scythe** (wide slashes, kills heal you, 15s), **Plasma Blaster**
   (rapid-fire piercing shots, 10s) and the **Giant Sword** (an absurdly long blade, 9 tiles!, spins around
   you for 10s and cuts through everything).
+- **Test Arena:** a button on the title screen opens a sandbox world (its own save, never in your
+  world list) where monsters only come when you spawn them. Press **T** (or Arena Tools) to spawn any
+  monster or the Ogre King, clear them, change the monster level, take any Mystery Box weapon, get gold
+  or a level, heal, turn on god mode, knock yourself down, and switch between Revive in Place and the
+  Reboot Van. Friends can join it with its room code to try things together.
 - **Fair spawns:** monsters always appear just off every player's screen, never on top of anyone.
 - **8-bit everything:** pixel art drawn in code, a pixel font, and chiptune music and sound effects.
 

@@ -26,7 +26,8 @@ export const SHOP = [
 export const MAX_LEVEL = 5;
 export const SLASH_CD = 0.35;
 export const PICK_TIME = 30; // seconds everyone gets to choose a level-up before one is picked for them
-export const REBOOT_TIME = 4; // seconds a player card has to sit at the Reboot Van
+export const REBOOT_TIME = 4; // seconds someone has to stay by the Reboot Van to reboot a player
+export const VAN_REACH = 2.8; // how close counts as "at the van" (from any side; the van is solid)
 export const REVIVE_MODES = ['classic', 'van'];
 
 const ENEMY = {
@@ -126,7 +127,10 @@ export class Sim {
     const rules = save.rules || {};
     this.rules = { revive: REVIVE_MODES.includes(rules.revive) ? rules.revive : 'classic' };
     this.cards = new Map(); // downed player id -> { x, y, carrier, boot }
-    if (this.rules.revive === 'van') this.world.parkVan();
+    if (this.rules.revive === 'van') this.world.setVan(true);
+    // Test Arena: a sandbox where monsters only come when someone spawns them
+    this.arena = !!save.arena;
+    if (this.arena) this.phase = 'arena';
     // Mystery Box: who spun it, 'spin' (spinning) or 'ready' (prize waiting to be
     // taken, sinking back into the box), and seconds left in that stage.
     this.box = { user: null, stage: '', t: 0 };
@@ -263,6 +267,8 @@ export class Sim {
       this.buy(p, v);
     } else if (a === 'box') {
       this.spinBox(p);
+    } else if (a === 'arena' && this.arena && v && typeof v === 'object') {
+      this.arenaCmd(p, v);
     } else if (a === 'attack') {
       this.slash(p, v);
     }
@@ -288,6 +294,54 @@ export class Sim {
       if (!e.boss && !e.dead) {
         if (ENEMY[e.type].fly) { e.x += (rx / d) * 0.4; e.y += (ry / d) * 0.4; } else this.world.move(e, (rx / d) * 0.4, (ry / d) * 0.4, e.r * 0.7);
       }
+    }
+  }
+
+  // Test Arena tools (anyone in the arena can use them).
+  arenaCmd(p, v) {
+    const say = (m) => this.emit({ k: 'msg', m: `${p.name} ${m}` });
+    const name = (t) => ({ imp: 'Devil', ogre: 'Ogre King' }[t] || t[0].toUpperCase() + t.slice(1));
+    switch (v.c) {
+      case 'spawn': {
+        if (!ENEMY_TYPES.includes(v.t)) return;
+        const n = Math.max(1, Math.min(10, v.n | 0));
+        for (let i = 0; i < n; i++) {
+          let x = p.x, y = p.y;
+          for (let tries = 0; tries < 12; tries++) {
+            const a = Math.random() * Math.PI * 2, d = 4 + Math.random() * 2.5;
+            x = Math.max(2.6, Math.min(MAP - 2.6, p.x + Math.cos(a) * d)); y = Math.max(2.6, Math.min(MAP - 2.6, p.y + Math.sin(a) * d));
+            if (!this.world.hit(x, y, ENEMY[v.t].r)) break;
+          }
+          this.spawnEnemy(v.t, { x, y });
+        }
+        say(`spawned ${n} ${name(v.t)}${n > 1 ? 's' : ''}`);
+        break;
+      }
+      case 'clear': this.enemies = []; this.projs = this.projs.filter((q) => !q.enemy); say('cleared the monsters'); break;
+      case 'gold': p.gold += 100; say('took 100 gold'); break;
+      case 'level':
+        p.level++; p.xp = 0; p.xpNext = xpFor(p.level); p.pendingLevels++;
+        if (!p.choices.length) this.rollChoices(p);
+        this.emit({ k: 'lvl', id: p.id });
+        break;
+      case 'power': {
+        const pw = POWERS[v.k | 0];
+        if (!pw) return;
+        if (pw.k === 'giant') p.giantT = Math.min(BOX_SWORD * 2, (p.giantT || 0) + BOX_SWORD);
+        else { p.pw = pw.k; p.pwT = pw.t; }
+        say(`took the ${pw.name}`);
+        break;
+      }
+      case 'heal': if (p.dead) this.revive(p, 1); else p.hp = p.maxHp; break;
+      case 'god': p.god = !p.god; say(p.god ? 'is now invincible' : 'is no longer invincible'); break;
+      case 'down': p.god = false; p.inv = 0; p.dash = false; this.hurtPlayer(p, 1e6); break;
+      case 'wave': this.wave = Math.max(1, Math.min(50, this.wave + (v.d > 0 ? 1 : -1))); say(`set the monster level to ${this.wave}`); break;
+      case 'mode':
+        this.rules.revive = this.rules.revive === 'van' ? 'classic' : 'van';
+        this.world.setVan(this.rules.revive === 'van');
+        for (const pl of this.players.values()) if (pl.dead) this.revive(pl, 1);
+        say(`switched reviving to ${this.rules.revive === 'van' ? 'Reboot Van' : 'Revive in Place'}`);
+        break;
     }
   }
 
@@ -461,7 +515,7 @@ export class Sim {
   }
 
   hurtPlayer(p, dmg) {
-    if (p.dead || p.inv > 0 || p.dash) return;
+    if (p.dead || p.inv > 0 || p.dash || p.god) return;
     p.hp -= dmg;
     p.inv = 0.5;
     this.emit({ k: 'hurt', id: p.id });
@@ -551,9 +605,9 @@ export class Sim {
     return pool[0];
   }
 
-  spawnEnemy(type) {
+  spawnEnemy(type, at = null) {
     const def = ENEMY[type];
-    const { x, y } = this.spawnSpot(def.r);
+    const { x, y } = at || this.spawnSpot(def.r);
     const n = Math.max(1, this.party().length);
     const L = this.wave - 1; // monsters level up with every wave
     const hpMul = (1 + 0.3 * L) * (1 + 0.5 * (n - 1));
@@ -687,6 +741,11 @@ export class Sim {
         this.spawnT = Math.max(0.4, 1.6 - this.wave * 0.05);
       }
       if (all.length && !alive.length) { this.wipe(); return; }
+    } else if (this.phase === 'arena' && all.length && !alive.length) {
+      // everyone down in the arena: back on your feet at camp, no harm done
+      let i = 0;
+      for (const p of all) { this.revive(p, 1); const s = this.world.campSpot(i++); this.teleport(p, s.x, s.y); }
+      this.emit({ k: 'msg', m: 'Everyone went down: back to camp. (Test Arena)' });
     }
 
     this.updatePlayers(dt, all, alive);
@@ -911,7 +970,8 @@ export class Sim {
       const p = this.players.get(id);
       if (!p || !p.dead) { this.cards.delete(id); continue; }
       if (c.atVan) {
-        c.boot += dt / REBOOT_TIME;
+        // it only reboots while someone stands by the van; walk away and it waits
+        if (alive.some((o) => !o.dead && Math.hypot(o.x - van.x, o.y - van.y) < VAN_REACH)) c.boot += dt / REBOOT_TIME;
         if (c.boot >= 1) {
           this.revive(p, 0.5);
           const a = Math.random() * Math.PI;
@@ -931,9 +991,9 @@ export class Sim {
         this.emit({ k: 'card', id: taker.id, m: `${taker.name} picked up ${p.name}'s card` });
       }
       c.x = carrier.x; c.y = carrier.y;
-      if (Math.hypot(carrier.x - van.x, carrier.y - van.y) < 2.8) { // reachable from any side of the (solid) van
+      if (Math.hypot(carrier.x - van.x, carrier.y - van.y) < VAN_REACH) {
         c.atVan = true; c.carrier = null; c.boot = 0; c.x = van.x; c.y = van.y;
-        this.emit({ k: 'card', id: carrier.id, m: `${carrier.name} dropped ${p.name}'s card at the van. Rebooting...` });
+        this.emit({ k: 'card', id: carrier.id, m: `${carrier.name} dropped ${p.name}'s card at the van. Stay by the van to reboot them!` });
       }
     }
   }
@@ -986,7 +1046,7 @@ export class Sim {
       en: this.enemies.map((e) => [e.id, ENEMY_TYPES.indexOf(e.type), ri(e.x), ri(e.y), e.dir, e.flash > 0 ? 1 : 0, Math.max(0, Math.ceil(e.hp)), e.maxHp, this.enemyState(e, anyone)]),
       pr: this.projs.map((q) => [q.id, PROJ_KINDS.indexOf(q.kind), ri(q.x), ri(q.y), ri(q.vx), ri(q.vy)]),
       pk: this.pickups.map((k) => [k.id, PICKUP_KINDS.indexOf(k.kind), ri(k.x), ri(k.y)]),
-      rv: this.rules.revive,
+      rv: this.rules.revive, ar: this.arena ? 1 : 0,
       bx: this.box.stage ? [this.box.user, Math.ceil(this.box.t * 10), this.box.stage === 'ready' ? 1 : 0, this.box.prize] : 0,
       cd: [...this.cards].map(([id, c]) => [id, ri(c.x), ri(c.y), c.carrier || 0, Math.round(c.boot * 100), c.atVan ? 1 : 0]),
     };
@@ -1015,7 +1075,7 @@ export class Sim {
     return {
       lv: p.level, xp: p.xp, xn: p.xpNext, g: p.gold, ch: p.choices, w: p.weapons, ps: p.passives,
       pm: p.perm, spd: p.spd, tpn: p.tpn, hp: Math.ceil(p.hp), mhp: p.maxHp, dead: p.dead,
-      wt: !!p.waiting, pn: p.pendingLevels,
+      wt: !!p.waiting, pn: p.pendingLevels, god: !!p.god,
     };
   }
 }

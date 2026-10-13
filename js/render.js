@@ -8,7 +8,7 @@ import {
   drawText, textWidth, drawShadow, MERCHANT_LOOK, RUN_FRAME_MS, vanSprite, boxSprite, BOX_SHAKE, BOX_OPEN, BOX_PRIZES, BOX_GIANT, BOX_BODY,
 } from './sprites.js';
 import { paintGround, sceneSprite, TALL } from './scenery.js';
-import { bladePositions, auraRadius, giantAngle, GIANT_LEN, BOX_COST, BOX_SPIN, BOX_CLAIM, SMASH_TIME, CHARGE_TIME } from './sim.js';
+import { bladePositions, auraRadius, giantAngle, GIANT_LEN, BOX_COST, BOX_SPIN, BOX_CLAIM, SMASH_TIME, CHARGE_TIME, VAN_REACH } from './sim.js';
 
 const BG = '#0c1a10';
 const DETAIL = 2;
@@ -135,7 +135,9 @@ export class Renderer {
     const cards = view.cards || [];
     const atVan = cards.filter((c) => c.atVan);
     const booting = atVan.reduce((m, c) => Math.max(m, c.boot), 0);
-    if (view.van) items.push({ d: world.van.y, k: 'van', x: world.van.x, y: world.van.y, on: atVan.length > 0 });
+    // a dropped-off card only reboots while someone stands by the van
+    const manned = players.some((p) => !p.dead && Math.hypot(p.x - world.van.x, p.y - world.van.y) < VAN_REACH);
+    if (view.van) items.push({ d: world.van.y, k: 'van', x: world.van.x, y: world.van.y, on: atVan.length > 0 && manned });
     for (const c of cards) if (!c.carrier && !c.atVan) items.push({ d: c.y + 0.05, k: 'card', e: c });
     for (const k of pickups) if (inView(k.x, k.y)) items.push({ d: k.y - 0.3, k: 'pickup', e: k });
     for (const e of enemies) if (inView(e.x, e.y)) items.push({ d: e.y, k: 'enemy', e });
@@ -219,9 +221,14 @@ export class Renderer {
       // cards dropped off at the van float in its hologram while they reboot
       atVan.forEach((c, i) => this.drawCard(c, vx + (i - (atVan.length - 1) / 2) * 14, vy - 38 + Math.round(Math.sin(time * 4 + i)), time));
       if (atVan.length) {
-        // beam of light up from the hologram while someone reboots
-        g.fillStyle = `rgba(168,232,255,${0.18 + 0.1 * Math.sin(time * 12)})`;
-        g.fillRect(vx - 6, vy - 200, 12, 200 - 50);
+        if (manned) {
+          // beam of light up from the hologram while someone reboots
+          g.fillStyle = `rgba(168,232,255,${0.18 + 0.1 * Math.sin(time * 12)})`;
+          g.fillRect(vx - 6, vy - 200, 12, 200 - 50);
+        } else if (Math.floor(time * 2) % 2) {
+          const t = 'STAND HERE TO REBOOT';
+          drawText(g, t, vx - (textWidth(t) >> 1), vy - 76, '#f8d838');
+        }
         g.fillStyle = '#202030'; g.fillRect(vx - 16, vy - 58, 32, 4);
         g.fillStyle = '#a8e8ff'; g.fillRect(vx - 15, vy - 57, Math.round(30 * Math.min(1, booting)), 2);
       }

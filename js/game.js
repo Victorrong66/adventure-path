@@ -1,7 +1,7 @@
 // A running game session. The game server runs the Sim and streams snapshots to
 // everyone (the host included); each player predicts their own movement and draws
 // everything else from snapshots. The host's browser keeps the world save.
-import { WEAPONS, PASSIVES, SHOP, BOX_COST, POWERS, slashCooldown, ENEMY_TYPES, PROJ_KINDS, PICKUP_KINDS } from './sim.js';
+import { WEAPONS, PASSIVES, SHOP, BOX_COST, POWERS, ENEMY_TYPES as MOB_TYPES, slashCooldown, ENEMY_TYPES, PROJ_KINDS, PICKUP_KINDS } from './sim.js';
 import { World } from './world.js';
 import { screenToWorldDir, facingFromScreen, escapeHtml } from './util.js';
 import { storeWorld, loadMobFace, saveMobFace, loadRules } from './save.js';
@@ -138,7 +138,7 @@ export class Game {
   applySnapshot(s) {
     this.lastSnapAt = performance.now();
     this.state = s;
-    if (s.rv === 'van') this.world.parkVan(); // you can't walk through the Reboot Van
+    this.world.setVan(s.rv === 'van'); // you can't walk through the Reboot Van
     this.serverT = s.T;
     this.serverTAt = performance.now();
     this.priv = s.me;
@@ -526,12 +526,17 @@ export class Game {
     if (inp.hit('r')) this.act('ready');
     if (inp.hit('e')) this.toggleShop(!this.shopOpen);
     if (inp.hit('f')) this.spinBox();
+    if (inp.hit('t') && this.state.ar) this.toggleArena();
     for (const n of ['1', '2', '3']) if (inp.hit(n)) this.act('pick', Number(n) - 1);
   }
 
   toggleMute() {
     const m = this.audio.toggleMute();
     $('menu-mute').textContent = m ? 'Unmute' : 'Mute';
+  }
+
+  toggleArena(open = $('arena').classList.contains('hidden')) {
+    $('arena').classList.toggle('hidden', !open);
   }
 
   // The shop is private: only you see it, and the game keeps going for everyone.
@@ -566,6 +571,21 @@ export class Game {
     on('act-ready', 'click', () => this.act('ready'));
     on('act-shop', 'click', () => this.toggleShop(true));
     on('act-box', 'click', () => this.spinBox());
+    // Test Arena tools
+    const mobName = (t) => ({ imp: 'Devil', ogre: 'Ogre King' }[t] || t[0].toUpperCase() + t.slice(1));
+    $('arena-mob').innerHTML = MOB_TYPES.map((t) => `<option value="${t}">${mobName(t)}</option>`).join('');
+    $('arena-power').innerHTML = POWERS.map((w, i) => `<option value="${i}">${escapeHtml(w.name)}</option>`).join('');
+    on('act-arena', 'click', () => this.toggleArena());
+    on('arena-close', 'click', () => this.toggleArena(false));
+    on('arena', 'click', (e) => {
+      const b = e.target.closest('[data-arena]');
+      if (!b) return;
+      const c = b.dataset.arena;
+      if (c === 'spawn1' || c === 'spawn5') this.act('arena', { c: 'spawn', t: $('arena-mob').value, n: c === 'spawn1' ? 1 : 5 });
+      else if (c === 'wave-' || c === 'wave+') this.act('arena', { c: 'wave', d: c === 'wave+' ? 1 : -1 });
+      else if (c === 'power') this.act('arena', { c: 'power', k: Number($('arena-power').value) });
+      else this.act('arena', { c });
+    });
     on('act-dash', 'touchstart', (e) => { e.preventDefault(); this.input.touchDash = true; });
     on('act-dash', 'click', () => { this.input.touchDash = true; });
     const atkOn = (e) => { e.preventDefault(); this.input.touchAttack = true; $('act-attack').classList.add('down'); };
@@ -649,9 +669,17 @@ export class Game {
 
     const players = view.players;
     const readyCount = players.filter((p) => p.ready).length;
-    $('hud-wave').textContent = `WAVE ${wave}`;
+    const arena = !!this.state.ar;
+    $('hud-wave').textContent = arena ? `TEST ARENA · MONSTER LV ${wave}` : `WAVE ${wave}`;
+    $('act-arena').classList.toggle('hidden', !arena);
+    if (arena) {
+      $('arena-wave').textContent = wave;
+      $('arena-god').textContent = st.god ? 'God Mode: On' : 'God Mode: Off';
+      $('arena-mode').textContent = this.state.rv === 'van' ? 'Reviving: Reboot Van' : 'Reviving: In Place';
+    }
     let phaseText = '';
-    if (phase === 'camp') phaseText = `At camp. Press R when ready (${readyCount}/${players.length})`;
+    if (phase === 'arena') phaseText = `${left} monster${left === 1 ? '' : 's'}. Press T for the arena tools`;
+    else if (phase === 'camp') phaseText = `At camp. Press R when ready (${readyCount}/${players.length})`;
     else if (phase === 'rest') phaseText = `Next wave in ${pt}...`;
     else phaseText = `${left} monsters left`;
     const pzh = this.pauseInfo();
@@ -743,6 +771,6 @@ export class Game {
       }
     }
 
-    this.audio.playSong(phase === 'wave' ? 'battle' : 'camp');
+    this.audio.playSong(phase === 'wave' || (phase === 'arena' && view.enemies.length) ? 'battle' : 'camp');
   }
 }
