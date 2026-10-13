@@ -8,7 +8,7 @@ import {
   drawText, textWidth, drawShadow, MERCHANT_LOOK, RUN_FRAME_MS, vanSprite, boxSprite, BOX_SHAKE, BOX_OPEN, BOX_PRIZES, BOX_GIANT, BOX_BODY,
 } from './sprites.js';
 import { paintGround, sceneSprite, TALL } from './scenery.js';
-import { bladePositions, auraRadius, giantAngle, GIANT_LEN, BOX_COST, BOX_SPIN, BOX_CLAIM, SMASH_TIME, CHARGE_TIME, VAN_REACH } from './sim.js';
+import { bladePositions, auraRadius, giantAngle, GIANT_LEN, BOX_COST, BOX_SPIN, BOX_CLAIM, SMASH_TIME, CHARGE_TIME, VAN_REACH, MELEE_TIME, SHOOT_TIME } from './sim.js';
 
 const BG = '#0c1a10';
 const DETAIL = 2;
@@ -16,6 +16,8 @@ const ATTACK_POSE = 0.42; // seconds a sword swing lasts (wind-up, slash, follow
 const DIZZY_MS = 1200;    // a downed hero sees stars this long before lying flat
 const WIN_POSE_MS = 2000; // victory pose after a wave is cleared
 const DASH_POSE_MS = 300; // the 5-frame dash attack pose plays over this long
+// which monster's sheet has the art for each monster projectile
+const SHOT_ART = { slime: 'slime', spore: 'shroomling', batbolt: 'bat', rock: 'golem', wisp: 'ghost' };
 
 export class Renderer {
   constructor(canvas) {
@@ -193,6 +195,18 @@ export class Renderer {
             g.translate(this.sx(it.e.x, it.e.y), this.sy(it.e.x, it.e.y) - 6);
             g.rotate(Math.atan2(it.e.vy, it.e.vx) + Math.PI);
             g.drawImage(f.img, -f.w * 0.3, -f.h / 2, f.w, f.h);
+            g.restore();
+            break;
+          }
+          const art = SHOT_ART[it.e.kind];
+          if (art && animFrames(art, 'shot')) {
+            // a monster's projectile (slime blob, spores, bat bolt, rocks, ghost wisp): its
+            // art flies right, so turn it to face where it's going
+            const f = monsterAnim(art, 'shot', 1, Math.floor(time * 10 + it.e.id) % animFrames(art, 'shot'));
+            g.save();
+            g.translate(this.sx(it.e.x, it.e.y), this.sy(it.e.x, it.e.y) - 6);
+            g.rotate(it.e.kind === 'rock' ? 0 : Math.atan2(it.e.vy, it.e.vx));
+            g.drawImage(f.img, -f.w * 0.7, -f.h / 2, f.w, f.h);
             g.restore();
             break;
           }
@@ -410,6 +424,7 @@ export class Renderer {
     if (e.st === 3) s = play('smash', SMASH_TIME);
     else if (e.st === 2) s = play('swing', CHARGE_TIME);
     else if (e.st === 4) s = play((e.dir || 1) < 0 ? 'shootL' : 'shootR', 0.45);
+    else if (e.st === 5) s = play((e.dir || 1) < 0 ? 'atkL' : 'atkR', e.type === 'goblin' || e.type === 'skeleton' ? MELEE_TIME : SHOOT_TIME);
     else if (e.flash && e.type === 'ogre') s = monsterAnim(e.type, 'hurt', e.dir || 1, Math.floor(time * 12) % 2);
     else if (e.st === 1) s = monsterAnim(e.type, 'idle', e.dir || 1, Math.floor(time * 6) % Math.max(1, animFrames(e.type, 'idle')));
     s = s || monsterSprite(e.type, e.dir || 1, frame);

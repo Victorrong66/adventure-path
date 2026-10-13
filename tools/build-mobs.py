@@ -148,9 +148,84 @@ for path, name, height, anims in EXTRA:
     if name == 'imp':  # shooting to the right: the left-facing frames mirrored
         frames += [(name, 'shootR', f.transpose(Image.FLIP_LEFT_RIGHT)) for n, a, f in frames if n == name and a == 'shootL']
 
+# tools/mob-attacks.png: attack animations (and the ghost's walk) on a smooth coloured
+# background. Each monster's row: its walk-left frames (only used to match its size to
+# the walk frames above), then its attack frames and the projectile it shoots, if any.
+# Attacks face right (mirrored for the left); projectiles fly to the right.
+def clean_gradient(path, tol=6):
+    """Flood the background in from the edges through smoothly changing colour (it stops
+    at the sprites' hard outlines)."""
+    global W, H, px
+    im = Image.open(path).convert('RGBA'); W, H = im.size; px = im.load()
+    seen = bytearray(W * H)
+    st = [(x, y) for x in range(W) for y in (0, H - 1)] + [(x, y) for y in range(H) for x in (0, W - 1)]
+    for x, y in st: seen[y * W + x] = 1
+    gone = []
+    while st:
+        x, y = st.pop(); gone.append((x, y)); p = px[x, y]
+        for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            if 0 <= nx < W and 0 <= ny < H and not seen[ny * W + nx]:
+                q = px[nx, ny]
+                if max(abs(p[0] - q[0]), abs(p[1] - q[1]), abs(p[2] - q[2])) <= tol:
+                    seen[ny * W + nx] = 1; st.append((nx, ny))
+    for q in gone: px[q] = (0, 0, 0, 0)
+    # label boxes: wide, short, dark navy rectangles
+    navy = lambda q: q[3] and max(q[:3]) <= 50 and q[2] >= q[0] + 4
+    done = bytearray(W * H)
+    for y in range(H):
+        for x in range(W):
+            if done[y * W + x] or not navy(px[x, y]): continue
+            st = [(x, y)]; done[y * W + x] = 1; c = []
+            while st:
+                cx, cy = st.pop(); c.append((cx, cy))
+                for nx, ny in ((cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)):
+                    if 0 <= nx < W and 0 <= ny < H and not done[ny * W + nx] and navy(px[nx, ny]):
+                        done[ny * W + nx] = 1; st.append((nx, ny))
+            xs = [q[0] for q in c]; ys = [q[1] for q in c]
+            if len(c) > 800 and max(xs) - min(xs) > 80 and max(ys) - min(ys) < 40:
+                for yy in range(max(0, min(ys) - 3), min(H, max(ys) + 4)):
+                    for xx in range(max(0, min(xs) - 3), min(W, max(xs) + 4)): px[xx, yy] = (0, 0, 0, 0)
+    return im
+
+ATTACK_ROWS = {  # monster: (rows y0-y1, walk-left x range, {animation: cuts})
+    'slime': ((35, 100), (125, 500), {'atk': [975, 1085, 1180], 'shot': [1180, 1300, 1400, 1500]}),
+    'goblin': ((126, 215), (120, 515), {'atk': [975, 1105, 1212, 1312, 1400, 1515]}),
+    'skeleton': ((232, 334), (100, 525), {'atk': [978, 1066, 1155, 1260, 1395, 1515]}),
+    'shroomling': ((355, 434), (40, 505), {'atk': [978, 1083, 1168], 'shot': [1255, 1315, 1420, 1500]}),
+    'bat': ((458, 548), (40, 505), {'atk': [958, 1074, 1210, 1328], 'shot': [1328, 1415, 1515]}),
+    'golem': ((563, 656), (95, 525), {'atk': [970, 1093, 1212, 1322], 'shot': [1322, 1418, 1520]}),
+    'ghost': ((930, 1014), (112, 530), {'left': [112, 198, 288, 375, 455, 530], 'right': [535, 620, 700, 790, 870, 960],
+                                        'atk': [995, 1090, 1192], 'shot': [1192, 1290, 1400, 1475]}),
+}
+HEIGHT.setdefault('ghost', 19)
+im = clean_gradient('tools/mob-attacks.png')
+attack_frames = []
+for name, ((y0, y1), (wx0, wx1), anims) in ATTACK_ROWS.items():
+    walk = [c for c in shapes(wx0, y0, wx1, y1) if len(c) >= 400]
+    sheet_h = sum(max(q[1] for q in c) - min(q[1] for q in c) + 1 for c in walk) / len(walk)
+    for anim, cuts in anims.items():
+        for i in range(len(cuts) - 1):
+            parts = [c for c in shapes(cuts[i], y0, cuts[i + 1], y1) if len(c) >= 12]
+            cell = Image.new('RGBA', im.size); cp = cell.load()
+            for c in parts:
+                for q in c: cp[q] = px[q]
+            attack_frames.append((name, anim, cell.crop(cell.getbbox()), sheet_h))
+
 # scale each monster so its frames average the wanted height (at DETAIL x game size)
 out = []
+for name, anim, f, sheet_h in attack_frames:  # same size as the monster's own walk frames
+    k = HEIGHT[name] * DETAIL / sheet_h
+    sm = f.resize((max(1, round(f.width * k)), max(1, round(f.height * k))), Image.BOX)
+    p = sm.load()
+    for y in range(sm.height):
+        for x in range(sm.width):
+            r, g, b, a = p[x, y]
+            p[x, y] = (r, g, b, 255) if a >= 128 else (0, 0, 0, 0)
+    sm = sm.crop(sm.getbbox())
+    out.append((name, 'atkR' if anim == 'atk' else anim, sm))
+    if anim == 'atk': out.append((name, 'atkL', sm.transpose(Image.FLIP_LEFT_RIGHT)))
 for name, height in HEIGHT.items():
+    if name == 'ghost': continue  # all from the attack sheet
     mine = [f for f in frames if f[0] == name]
     ref = [f for f in mine if f[1] in ('left', 'right')] or mine[:1]  # size by the walk (or first) frames
     k = height * DETAIL / (sum(f[2].height for f in ref) / len(ref))

@@ -31,18 +31,23 @@ export const VAN_REACH = 2.8; // how close counts as "at the van" (from any side
 export const REVIVE_MODES = ['classic', 'van'];
 
 const ENEMY = {
-  slime: { hp: 14, spd: 1.1, dmg: 8, r: 0.35, xp: 1, minWave: 1, weight: 10 },
-  bat: { hp: 8, spd: 2.5, dmg: 5, r: 0.3, xp: 1, minWave: 2, weight: 6, fly: true },
-  goblin: { hp: 24, spd: 1.7, dmg: 10, r: 0.35, xp: 2, minWave: 3, weight: 6 },
-  skeleton: { hp: 42, spd: 1.3, dmg: 14, r: 0.38, xp: 3, minWave: 5, weight: 5 },
-  ghost: { hp: 30, spd: 1.5, dmg: 12, r: 0.35, xp: 3, minWave: 7, weight: 4, fly: true },
+  slime: { hp: 14, spd: 1.1, dmg: 8, r: 0.35, xp: 1, minWave: 1, weight: 10, shot: 'slime', range: 5.5, shotCd: 5, shotSpd: 4 },
+  bat: { hp: 8, spd: 2.5, dmg: 5, r: 0.3, xp: 1, minWave: 2, weight: 6, fly: true, shot: 'batbolt', range: 5, shotCd: 4.5, shotSpd: 6 },
+  goblin: { hp: 24, spd: 1.7, dmg: 10, r: 0.35, xp: 2, minWave: 3, weight: 6, melee: true },
+  skeleton: { hp: 42, spd: 1.3, dmg: 14, r: 0.38, xp: 3, minWave: 5, weight: 5, melee: true },
+  ghost: { hp: 30, spd: 1.5, dmg: 12, r: 0.35, xp: 3, minWave: 7, weight: 4, fly: true, shot: 'wisp', range: 6.5, shotCd: 4, shotSpd: 4.5 },
   imp: { hp: 26, spd: 1.4, dmg: 8, r: 0.35, xp: 3, minWave: 9, weight: 3, ranged: true },
-  shroomling: { hp: 34, spd: 1.2, dmg: 10, r: 0.35, xp: 2, minWave: 4, weight: 5 },
-  golem: { hp: 160, spd: 0.75, dmg: 22, r: 0.6, xp: 8, minWave: 8, weight: 2 },
+  shroomling: { hp: 34, spd: 1.2, dmg: 10, r: 0.35, xp: 2, minWave: 4, weight: 5, shot: 'spore', range: 6, shotCd: 4, shotSpd: 4.5 },
+  golem: { hp: 160, spd: 0.75, dmg: 22, r: 0.6, xp: 8, minWave: 8, weight: 2, shot: 'rock', range: 7, shotCd: 5, shotSpd: 4.2 },
   ogre: { hp: 450, spd: 1.25, dmg: 25, r: 0.8, xp: 40, boss: true },
 };
 export const ENEMY_TYPES = Object.keys(ENEMY);
-export const PROJ_KINDS = ['bolt', 'fire', 'plasma'];
+export const PROJ_KINDS = ['bolt', 'fire', 'plasma', 'slime', 'spore', 'batbolt', 'rock', 'wisp'];
+// Monster attacks: melee monsters (goblin, skeleton) stop and swing, landing the hit
+// MELEE_HIT seconds in if you're still in reach; shooters pause to fire their
+// projectile, which leaves SHOOT_FIRE seconds into the SHOOT_TIME-long attack.
+export const MELEE_TIME = 0.55, MELEE_HIT = 0.3, MELEE_REACH = 0.85;
+export const SHOOT_TIME = 0.45, SHOOT_FIRE = 0.25;
 export const PICKUP_KINDS = ['xp', 'xp2', 'xp3', 'coin', 'heart', 'gsword'];
 
 // Sword stats by level (1-5): reach in tiles, damage multiplier, seconds between swings.
@@ -898,9 +903,40 @@ export class Sim {
             mx = ux; my = uy;
             if (e.cd <= 0 && d < 8) { e.charge = CHARGE_TIME; e.cvx = ux * 4; e.cvy = uy * 4; e.cd = 4.5; this.emit({ k: 'sfx', s: 'roar' }); }
           }
+        } else if (def.melee) {
+          // walk up, then stop and swing; the hit lands partway through
+          if (e.atk > 0) {
+            e.atk -= dt;
+            if (!e.atkHit && e.atk <= MELEE_TIME - MELEE_HIT) {
+              e.atkHit = true;
+              if (d < e.r + MELEE_REACH + 0.35) this.hurtPlayer(target, e.dmg);
+            }
+          } else {
+            mx = ux; my = uy;
+            e.cd -= dt;
+            if (e.cd <= 0 && d < e.r + MELEE_REACH) {
+              e.atk = MELEE_TIME; e.atkHit = false; e.cd = 1.3; e.dir = ux >= 0 ? 1 : -1; mx = my = 0;
+            }
+          }
+        } else if (def.shot) {
+          // chase, and every so often stop to shoot
+          if (e.atk > 0) {
+            e.atk -= dt;
+            if (!e.atkHit && e.atk <= SHOOT_TIME - SHOOT_FIRE) {
+              e.atkHit = true;
+              const v = def.shotSpd;
+              this.projs.push({ id: this.nid++, kind: def.shot, x: e.x, y: e.y, vx: ux * v, vy: uy * v, dmg: Math.round(e.dmg * 0.8), life: def.range / v + 0.6, enemy: true });
+            }
+          } else {
+            mx = ux; my = uy;
+            e.cd -= dt;
+            if (e.cd <= 0 && d < def.range && d > 1.5) {
+              e.atk = SHOOT_TIME; e.atkHit = false; e.cd = def.shotCd * (0.8 + Math.random() * 0.4); e.dir = ux >= 0 ? 1 : -1; mx = my = 0;
+            }
+          }
         } else { mx = ux; my = uy; }
-        // Contact damage
-        if (d < e.r + 0.35) this.hurtPlayer(target, e.dmg);
+        // Contact damage (melee monsters hurt with their swing instead)
+        if (d < e.r + 0.35 && !def.melee) this.hurtPlayer(target, e.dmg);
       }
       // Separation
       let sx = 0, sy = 0;
@@ -936,7 +972,7 @@ export class Sim {
         else e.stuckT = 0;
         if (e.stuckT > 0.8) { e.stuckT = 0; e.slipT = 1.5; }
       }
-      if (Math.abs(vx) > 0.001) e.dir = vx > 0 ? 1 : -1;
+      if (Math.abs(vx) > 0.001 && !(e.atk > 0)) e.dir = vx > 0 ? 1 : -1;
     }
   }
 
@@ -1053,11 +1089,13 @@ export class Sim {
   }
 
   // What a monster is doing, for its animation: 0 walking, 1 standing (nobody to chase),
-  // 2 charging (Ogre King's swing), 3 ground smash, 4 shooting a fireball.
+  // 2 charging (Ogre King's swing), 3 ground smash, 4 shooting a fireball,
+  // 5 attacking (melee swing, or stopping to shoot).
   enemyState(e, anyone) {
     if (e.smash > 0) return 3;
     if (e.charge > 0) return 2;
     if (e.shotAt !== undefined && this.t - e.shotAt < 0.45) return 4;
+    if (e.atk > 0) return 5;
     return anyone ? 0 : 1;
   }
 
