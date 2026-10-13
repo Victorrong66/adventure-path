@@ -137,16 +137,16 @@ function makeBald(d, roles, w, h, skin) {
   }
   spans.sort((p, q) => (p[1] - p[0]) - (q[1] - q[0]));
   const [a, b] = spans[spans.length >> 1];
-  const cx = (a + b) / 2, rx = (b - a) / 2 - 0.5, yt = y0 + 2, cy = yt + (y1 - yt) * 0.65;
+  // a circle across the skull (straight sides below its middle, down to the face)
+  const cx = (a + b) / 2, rx = (b - a) / 2 - 0.5, yt = y0 + 2, cy = yt + rx;
   const inside = (x, y) => {
-    if (y < yt || y > y1) return false;
+    if (y < yt || y > Math.max(y1, cy)) return false;
     if (y >= cy) return Math.abs(x - cx) <= rx;
-    const t = (cy - y) / (cy - yt);
-    return Math.abs(x - cx) <= rx * Math.sqrt(1 - t * t);
+    return (x - cx) ** 2 + (y - cy) ** 2 <= rx * rx;
   };
   for (const i of [...S]) { const x = i % w, y = Math.floor(i / w); if (!inside(x, y)) { set(x, y, [0, 0, 0], 0); S.delete(i); } }
   // fill the dome (gaps between spikes)
-  for (let y = Math.max(0, yt); y <= Math.min(h - 1, Math.floor(cy)); y++) {
+  for (let y = Math.max(0, yt); y <= Math.min(h - 1, Math.floor(Math.max(y1, cy))); y++) {
     for (let x = 0; x < w; x++) if (inside(x, y) && !at(x, y)) { roles[y * w + x] = 253; S.add(y * w + x); }
   }
   // spike tips drawn only in outline: dark pixels above the ears, outside the dome, not
@@ -158,12 +158,22 @@ function makeBald(d, roles, w, h, skin) {
     for (let dy = -1; dy <= 1 && !near; dy++) for (let dx = -1; dx <= 1; dx++) if (body(x + dx, y + dy)) { near = true; break; }
     if (!near) set(x, y, [0, 0, 0], 0);
   }
-  // skin over the scalp, with a little shine
+  // the scalp is exactly the face's skin colour: the most common shade among the lighter
+  // half of this frame's skin pixels (so not a shadow tone)
+  const skinPx = [];
+  for (let i = 0; i < w * h; i++) if (roles[i] === 252) skinPx.push(i);
+  const L = (i) => lum(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]);
+  const mid = skinPx.map(L).sort((p, q) => p - q)[skinPx.length >> 1] || 0;
+  const count = new Map();
+  for (const i of skinPx) {
+    if (L(i) < mid) continue;
+    const key = (d[i * 4] << 16) | (d[i * 4 + 1] << 8) | d[i * 4 + 2];
+    count.set(key, (count.get(key) || 0) + 1);
+  }
+  let best = -1, tone = skin;
+  for (const [key, n] of count) if (n > best) { best = n; tone = [key >> 16, (key >> 8) & 255, key & 255]; }
   for (const i of S) {
-    const x = i % w, y = Math.floor(i / w);
-    if (roles[i] !== 253) continue;
-    const k = y - yt <= 2 && x < cx ? 1.12 : 1;
-    set(x, y, skin.map((v) => Math.min(255, v * k)), 252);
+    if (roles[i] === 253) set(i % w, Math.floor(i / w), tone, 252);
   }
   // clear specks left floating
   const seen = new Uint8Array(w * h);
