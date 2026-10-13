@@ -132,106 +132,115 @@ ANIM = {
     'atkF': ((770, 722, 1536, 885), 6, 6),  # downward slash, for attacking while facing the viewer
     'dash': ((0, 925, 770, 1024), 5, 5), 'dashL': ((770, 925, 1536, 1024), 5, 5),
 }
-anim = Image.open('tools/hero-anim.png').convert('RGBA')
-ap = anim.load(); AW, AH = anim.size
-def flood(starts, pred):
-    seen = set(starts); st = list(starts); out = []
-    while st:
-        x, y = st.pop(); out.append((x, y))
-        for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
-            if 0 <= nx < AW and 0 <= ny < AH and (nx, ny) not in seen and pred(ap[nx, ny]):
-                seen.add((nx, ny)); st.append((nx, ny))
-    return out
-# label boxes: wide, short, dark navy rectangles
-navy = lambda q: max(q[:3]) <= 70 and q[2] - q[0] >= 6
-done = set()
-for y in range(AH):
-    for x in range(AW):
-        if (x, y) in done or not navy(ap[x, y]): continue
-        c = flood([(x, y)], navy); done.update(c)
-        xs = [q[0] for q in c]; ys = [q[1] for q in c]
-        if len(c) > 1500 and max(xs) - min(xs) > 100 and max(ys) - min(ys) < 40:
-            for yy in range(min(ys) - 3, max(ys) + 4):
-                for xx in range(min(xs) - 3, max(xs) + 4): ap[xx, yy] = (0, 0, 0, 0)
-checker = lambda q: not q[3] or (max(q[:3]) - min(q[:3]) <= 16 and sum(q[:3]) / 3 >= 160)
-edge = [(x, y) for x in range(AW) for y in (0, AH - 1)] + [(x, y) for y in range(AH) for x in (0, AW - 1)]
-for x, y in flood([q for q in edge if checker(ap[q])], checker): ap[x, y] = (0, 0, 0, 0)
-# Drop the drawn slash arcs, speed lines and dust: the game draws its own slash, and
-# they overlap neighbouring frames. Their blue edges go here (blades are only faintly
-# blue); what's left of them no longer touches a hero and is skipped below.
-for y in range(AH):
-    for x in range(AW):
-        r, g, b, a = ap[x, y]
-        if a and b - r > 38 and (r + g + b) / 3 > 90: ap[x, y] = (0, 0, 0, 0)
-# Their white cores: thick white areas (blade highlights are only thin lines), grown
-# out through the white pixels around them.
-white = lambda q: q[3] and min(q[:3]) >= 200 and max(q[:3]) - min(q[:3]) <= 30
-seeds = [(x, y) for y in range(2, AH - 2) for x in range(2, AW - 2) if white(ap[x, y]) and
-         sum(1 for dy in range(-2, 3) for dx in range(-2, 3) if white(ap[x + dx, y + dy])) >= 18]
-for x, y in flood(seeds, white): ap[x, y] = (0, 0, 0, 0)
-# ...and the faint lines left at their edges: light pixels with no dark outline nearby
-# (a blade is always within a few pixels of its outline).
-light = lambda q: q[3] and sum(q[:3]) / 3 >= 140 and max(q[:3]) - min(q[:3]) <= 45
-darkp = lambda q: q[3] and sum(q[:3]) < 150
-kill = [(x, y) for y in range(4, AH - 4) for x in range(4, AW - 4) if light(ap[x, y]) and
-        not any(darkp(ap[x + dx, y + dy]) for dy in range(-4, 5) for dx in range(-4, 5))]
-for q in kill: ap[q] = (0, 0, 0, 0)
+def cut_sheet(path, anims):
+    """Cut a labelled animation sheet (checkerboard background, dark label boxes) into
+    run_frames[name] for each animation."""
+    anim = Image.open(path).convert('RGBA')
+    ap = anim.load(); AW, AH = anim.size
+    def flood(starts, pred):
+        seen = set(starts); st = list(starts); out = []
+        while st:
+            x, y = st.pop(); out.append((x, y))
+            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if 0 <= nx < AW and 0 <= ny < AH and (nx, ny) not in seen and pred(ap[nx, ny]):
+                    seen.add((nx, ny)); st.append((nx, ny))
+        return out
+    # label boxes: wide, short, dark navy rectangles
+    navy = lambda q: max(q[:3]) <= 70 and q[2] - q[0] >= 6
+    done = set()
+    for y in range(AH):
+        for x in range(AW):
+            if (x, y) in done or not navy(ap[x, y]): continue
+            c = flood([(x, y)], navy); done.update(c)
+            xs = [q[0] for q in c]; ys = [q[1] for q in c]
+            if len(c) > 1500 and max(xs) - min(xs) > 100 and max(ys) - min(ys) < 40:
+                for yy in range(min(ys) - 3, max(ys) + 4):
+                    for xx in range(min(xs) - 3, max(xs) + 4): ap[xx, yy] = (0, 0, 0, 0)
+    checker = lambda q: not q[3] or (max(q[:3]) - min(q[:3]) <= 16 and sum(q[:3]) / 3 >= 160)
+    edge = [(x, y) for x in range(AW) for y in (0, AH - 1)] + [(x, y) for y in range(AH) for x in (0, AW - 1)]
+    for x, y in flood([q for q in edge if checker(ap[q])], checker): ap[x, y] = (0, 0, 0, 0)
+    # Drop the drawn slash arcs, speed lines and dust: the game draws its own slash, and
+    # they overlap neighbouring frames. Their blue edges go here (blades are only faintly
+    # blue); what's left of them no longer touches a hero and is skipped below.
+    for y in range(AH):
+        for x in range(AW):
+            r, g, b, a = ap[x, y]
+            if a and b - r > 38 and (r + g + b) / 3 > 90: ap[x, y] = (0, 0, 0, 0)
+    # Their white cores: thick white areas (blade highlights are only thin lines), grown
+    # out through the white pixels around them.
+    white = lambda q: q[3] and min(q[:3]) >= 200 and max(q[:3]) - min(q[:3]) <= 30
+    seeds = [(x, y) for y in range(2, AH - 2) for x in range(2, AW - 2) if white(ap[x, y]) and
+             sum(1 for dy in range(-2, 3) for dx in range(-2, 3) if white(ap[x + dx, y + dy])) >= 18]
+    for x, y in flood(seeds, white): ap[x, y] = (0, 0, 0, 0)
+    # ...and the faint lines left at their edges: light pixels with no dark outline nearby
+    # (a blade is always within a few pixels of its outline).
+    light = lambda q: q[3] and sum(q[:3]) / 3 >= 140 and max(q[:3]) - min(q[:3]) <= 45
+    darkp = lambda q: q[3] and sum(q[:3]) < 150
+    kill = [(x, y) for y in range(4, AH - 4) for x in range(4, AW - 4) if light(ap[x, y]) and
+            not any(darkp(ap[x + dx, y + dy]) for dy in range(-4, 5) for dx in range(-4, 5))]
+    for q in kill: ap[q] = (0, 0, 0, 0)
 
-def body(q):
-    """Hero pixels (hair, skin, cloak, clothes, outlines), as opposed to slash arcs and dust."""
-    r, g, b, a = q
-    if not a: return False
-    hh, l, s2 = colorsys.rgb_to_hls(r / 255, g / 255, b / 255); hh *= 360
-    return l < 0.22 or (s2 > 0.2 and (hh < 60 or 80 < hh < 170))
+    def body(q):
+        """Hero pixels (hair, skin, cloak, clothes, outlines), as opposed to slash arcs and dust."""
+        r, g, b, a = q
+        if not a: return False
+        hh, l, s2 = colorsys.rgb_to_hls(r / 255, g / 255, b / 255); hh *= 360
+        return l < 0.22 or (s2 > 0.2 and (hh < 60 or 80 < hh < 170))
 
-for name, ((x0, y0, x1, y1), count, use) in ANIM.items():
-    inside = lambda q: True
-    # connected shapes in the box
-    shapes = []; seen = set()
-    for y in range(y0, y1):
-        for x in range(x0, x1):
-            if (x, y) in seen or not ap[x, y][3]: continue
-            st = [(x, y)]; seen.add((x, y)); c = []
-            while st:
-                cx, cy = st.pop(); c.append((cx, cy))
-                for nx, ny in ((cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)):
-                    if x0 <= nx < x1 and y0 <= ny < y1 and (nx, ny) not in seen and ap[nx, ny][3]:
-                        seen.add((nx, ny)); st.append((nx, ny))
-            shapes.append(c)
-    # where the heroes are across the row: runs of columns with hero pixels
-    # (heads only: the top part of the row, since capes and swords overlap the next frame)
-    cols = [0] * AW
-    top = y0 + (y1 - y0) * (0.55 if name in ('atkF', 'atkB') else 0.42)  # the slashes crouch low
-    for c in shapes:
-        for x, y in c:
-            if y < top and body(ap[x, y]): cols[x] += 1
-    runs = []; start = None
-    for x in range(x0, x1 + 1):
-        on = x < x1 and cols[x] > 2
-        if on and start is None: start = x
-        if not on and start is not None:
-            if runs and start - runs[-1][1] < 2: runs[-1] = (runs[-1][0], x)
-            else: runs.append((start, x))
-            start = None
-    runs = [r for r in runs if sum(cols[r[0]:r[1]]) > 300]
-    assert len(runs) == count, f'{name}: expected {count} frames, found {len(runs)}: {runs}'
-    nearest = lambda x: min(range(len(runs)), key=lambda i: 0 if runs[i][0] <= x < runs[i][1] else min(abs(x - runs[i][0]), abs(x - runs[i][1])))
-    cells = [[] for _ in runs]
-    for c in shapes:
-        share = {}
-        for x, y in c:
-            if body(ap[x, y]): share[nearest(x)] = share.get(nearest(x), 0) + 1
-        if not share or len(share) and sum(share.values()) < 150: continue  # loose effects (arc pieces, speed lines, dust)
-        total = sum(share.values())
-        big = [i for i, n in share.items() if n > total * 0.25 and n > 400]
-        if len(big) <= 1: cells[max(share, key=share.get)] += c   # one hero (with its sword and slash)
-        else:
-            for x, y in c: cells[min(big, key=lambda i: abs(x - (runs[i][0] + runs[i][1]) / 2))].append((x, y))  # frames joined by effects
-    run_frames[name] = []
-    for c in cells[:use]:
-        cell = Image.new('RGBA', anim.size); cp = cell.load()
-        for x, y in c: cp[x, y] = ap[x, y]
-        run_frames[name].append(cell.crop(cell.getbbox()))
+    for name, ((x0, y0, x1, y1), count, use) in anims.items():
+        inside = lambda q: True
+        # connected shapes in the box
+        shapes = []; seen = set()
+        for y in range(y0, y1):
+            for x in range(x0, x1):
+                if (x, y) in seen or not ap[x, y][3]: continue
+                st = [(x, y)]; seen.add((x, y)); c = []
+                while st:
+                    cx, cy = st.pop(); c.append((cx, cy))
+                    for nx, ny in ((cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)):
+                        if x0 <= nx < x1 and y0 <= ny < y1 and (nx, ny) not in seen and ap[nx, ny][3]:
+                            seen.add((nx, ny)); st.append((nx, ny))
+                shapes.append(c)
+        # where the heroes are across the row: runs of columns with hero pixels
+        # (heads only: the top part of the row, since capes and swords overlap the next frame)
+        cols = [0] * AW
+        top = y0 + (y1 - y0) * (0.55 if name in ('atkF', 'atkB') else 0.42)  # the slashes crouch low
+        for c in shapes:
+            for x, y in c:
+                if y < top and body(ap[x, y]): cols[x] += 1
+        runs = []; start = None
+        for x in range(x0, x1 + 1):
+            on = x < x1 and cols[x] > 2
+            if on and start is None: start = x
+            if not on and start is not None:
+                if runs and start - runs[-1][1] < 2: runs[-1] = (runs[-1][0], x)
+                else: runs.append((start, x))
+                start = None
+        runs = [r for r in runs if sum(cols[r[0]:r[1]]) > 300]
+        assert len(runs) == count, f'{name}: expected {count} frames, found {len(runs)}: {runs}'
+        nearest = lambda x: min(range(len(runs)), key=lambda i: 0 if runs[i][0] <= x < runs[i][1] else min(abs(x - runs[i][0]), abs(x - runs[i][1])))
+        cells = [[] for _ in runs]
+        for c in shapes:
+            share = {}
+            for x, y in c:
+                if body(ap[x, y]): share[nearest(x)] = share.get(nearest(x), 0) + 1
+            if not share or len(share) and sum(share.values()) < 150: continue  # loose effects (arc pieces, speed lines, dust)
+            total = sum(share.values())
+            big = [i for i, n in share.items() if n > total * 0.25 and n > 400]
+            if len(big) <= 1: cells[max(share, key=share.get)] += c   # one hero (with its sword and slash)
+            else:
+                for x, y in c: cells[min(big, key=lambda i: abs(x - (runs[i][0] + runs[i][1]) / 2))].append((x, y))  # frames joined by effects
+        run_frames[name] = []
+        for c in cells[:use]:
+            cell = Image.new('RGBA', anim.size); cp = cell.load()
+            for x, y in c: cp[x, y] = ap[x, y]
+            run_frames[name].append(cell.crop(cell.getbbox()))
+
+cut_sheet('tools/hero-anim.png', ANIM)
+# tools/hero-side.png: smoother 9-frame side runs, drawn both ways (they replace the
+# side runs from hero-anim.png)
+cut_sheet('tools/hero-side.png', {'side': ((0, 80, 2172, 310), 9, 9), 'sideL': ((0, 428, 2172, 640), 9, 9)})
+run_scale = {n: 32 / (sum(f.height for f in run_frames[n]) / len(run_frames[n])) for n in ('side', 'sideL')}
 k_run = 34 / (sum(f.height for f in run_frames['front']) / len(run_frames['front']))
 
 # Bottom row: a 3-frame swing to the right (mirrored for the left), knocked dizzy,
@@ -255,7 +264,7 @@ run_frames['down'] = [cells[4]]
 run_frames['win'] = [cells[5]]
 for name in ('front', 'side', 'sideL', 'back', 'atk', 'atkL', 'atkF', 'atkB', 'dash', 'dashL', 'dizzy', 'down', 'win'):
     for cell in run_frames[name]:
-        k = k_old if name in ('dizzy', 'down', 'win') else k_run
+        k = k_old if name in ('dizzy', 'down', 'win') else run_scale.get(name, k_run)
         sm = cell.resize((max(1, round(cell.width * k)), max(1, round(cell.height * k))), Image.BOX)
         px = sm.load()
         for y in range(sm.height):
