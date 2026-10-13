@@ -36,12 +36,12 @@ im = clear_checker(Image.open('tools/hero-sheet.png'))
 # walk left (9), back (5), swing right (7), swing left (7, drawn mirrored so listed
 # right-to-left), then hurt / knocked out / victory.
 F = {
- 'front': [(355,21,448,167),(475,16,571,174),(608,16,700,174),(731,16,828,167),(862,16,958,169)],
- 'side':  [(38,189,167,353),(165,190,299,354),(300,190,432,352),(434,191,566,354),(567,192,709,358),
+ 'idleF': [(355,21,448,167)], '_front': [(355,21,448,167),(475,16,571,174),(608,16,700,174),(731,16,828,167),(862,16,958,169)],
+ 'idleR': [(38,189,167,353)], '_side':  [(38,189,167,353),(165,190,299,354),(300,190,432,352),(434,191,566,354),(567,192,709,358),
            (709,191,842,353),(844,192,977,355),(994,192,1113,356),(1123,191,1250,355)],
- 'sideL': [(63,369,195,535),(209,371,327,536),(337,371,469,534),(470,373,608,534),(609,376,752,539),
+ 'idleL': [(63,369,195,535)], '_sideL': [(63,369,195,535),(209,371,327,536),(337,371,469,534),(470,373,608,534),(609,376,752,539),
            (755,377,881,539),(883,378,1013,540),(1016,378,1143,540),(1146,377,1275,539)],
- 'back':  [(338,554,439,716),(462,554,568,716),(604,554,703,717),(736,555,837,715),(867,555,967,717)],
+ 'idleB': [(338,554,439,716)], '_back':  [(338,554,439,716),(462,554,568,716),(604,554,703,717),(736,555,837,715),(867,555,967,717)],
  'hurt':  [(62,1060,187,1181)],
  'down':  [(493,1097,656,1178)],
  'win':   [(1133,1027,1241,1183)],
@@ -86,6 +86,7 @@ SW, SH = swing.size
 
 frames = []
 for name, boxes in F.items():
+    if name.startswith('_'): continue  # old walk cycles, replaced by the run sheet
     for (x0, y0, x1, y1) in boxes:
         c = keep_big(im.crop((x0 - 2, y0 - 2, x1 + 3, y1 + 3)))
         sm = c.resize((max(1, round(c.width * K)), max(1, round(c.height * K))), Image.BOX)
@@ -113,6 +114,50 @@ def components(im, min_px):
             if len(comp) >= min_px:
                 out.append((comp, sum(p[0] for p in comp) / len(comp), sum(p[1] for p in comp) / len(comp)))
     return out
+
+# The run sheet (tools/hero-run.png, on black): rows of 4 frames running towards the
+# viewer, to the right, and away. Running left is the right-running row mirrored.
+RUN_ROWS = [('front', 15, 262), ('side', 262, 497), ('back', 497, 745)]
+run = Image.open('tools/hero-run.png').convert('RGBA')
+rp = run.load(); RW, RH = run.size
+seen_r = bytearray(RW * RH)
+st = [(x, y) for x in range(RW) for y in (0, RH - 1)] + [(x, y) for y in range(RH) for x in (0, RW - 1)]
+st = [q for q in st if max(rp[q][:3]) <= 8]
+for x, y in st: seen_r[y * RW + x] = 1
+while st:
+    x, y = st.pop(); rp[x, y] = (0, 0, 0, 0)
+    for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+        if 0 <= nx < RW and 0 <= ny < RH and not seen_r[ny * RW + nx] and max(rp[nx, ny][:3]) <= 8:
+            seen_r[ny * RW + nx] = 1; st.append((nx, ny))
+old_h = sum(f.height for n, f in frames if n == 'idleF') or 33
+run_frames = {}
+for name, y0, y1 in RUN_ROWS:
+    band = run.crop((0, y0, RW, y1))
+    parts = sorted(components(band, 300), key=lambda c: c[1])
+    # group shapes into heroes: a new hero starts where there's a wide gap in x
+    heroes = []
+    for comp, mx, my in parts:
+        xs = [x for x, _ in comp]
+        if heroes and min(xs) < heroes[-1]['x1'] + 20: heroes[-1]['px'] += comp; heroes[-1]['x1'] = max(heroes[-1]['x1'], max(xs))
+        else: heroes.append({'px': list(comp), 'x1': max(xs)})
+    run_frames[name] = []
+    bp = band.load()
+    for hero in heroes:
+        cell = Image.new('RGBA', band.size); cp = cell.load()
+        for x, y in hero['px']: cp[x, y] = bp[x, y]
+        run_frames[name].append(cell.crop(cell.getbbox()))
+k_run = 34 / (sum(f.height for f in run_frames['front']) / len(run_frames['front']))
+run_frames['sideL'] = [f.transpose(Image.FLIP_LEFT_RIGHT) for f in run_frames['side']]
+for name in ('front', 'side', 'sideL', 'back'):
+    for cell in run_frames[name]:
+        sm = cell.resize((max(1, round(cell.width * k_run)), max(1, round(cell.height * k_run))), Image.BOX)
+        px = sm.load()
+        for y in range(sm.height):
+            for x in range(sm.width):
+                rr, gg, bb, a = px[x, y]
+                if a <= 140: px[x, y] = (0, 0, 0, 0); continue
+                px[x, y] = (rr, gg, bb, ROLE[classify(rr, gg, bb, x, y, sm.width, sm.height, name)])
+        frames.append((name, sm))
 
 # each shape (body + raised sword, or a separate slash trail) belongs to the cell its centre is in
 swing_parts = components(swing, 400)

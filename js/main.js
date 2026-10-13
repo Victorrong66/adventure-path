@@ -8,7 +8,7 @@ import { newWorldSave } from './sim.js';
 import { World } from './world.js';
 import {
   SKINS, HAIR_STYLES, HAIR_COLORS, OUTFITS, OUTFIT_COLORS, EXTRAS, charSprite,
-  processFacePhoto, setMobFace, monsterSprite,
+  processFacePhoto, setMobFace, monsterSprite, RUN_FRAME_MS,
 } from './sprites.js';
 import {
   loadMobFace, saveMobFace, loadRules, saveRules,
@@ -223,7 +223,7 @@ $('char-done').addEventListener('click', () => {
     g.fillRect(90, 186, 60, 8);
     // Show off the poses: walk, breathe, swing
     const t = performance.now() % 3600;
-    const s = t < 1800 ? charSprite(draft.look, DIRS[previewDir], Math.floor(t / 75))
+    const s = t < 1800 ? charSprite(draft.look, DIRS[previewDir], Math.floor(t / RUN_FRAME_MS))
       : t < 3000 ? charSprite(draft.look, DIRS[previewDir], 0, 'idle')
         : charSprite(draft.look, DIRS[previewDir], (t - 3000) / 600, 'atk');
     g.drawImage(s.img, 120 - s.ox * 5, 190 - s.oy * 5, s.img.width * 5, s.img.height * 5);

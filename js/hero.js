@@ -54,7 +54,8 @@ const TUNIC = {
 };
 
 // One frame, recoloured for `look` = { skin, hair, outfitColor (hex), outfit (name) }.
-// kind: 'front' | 'back' (5 frames), 'side' | 'sideL' (9-frame walks right / left),
+// kind: 'front' | 'back' | 'side' | 'sideL' (4-frame runs: towards you, away, right, left),
+// 'idleF' | 'idleB' | 'idleR' | 'idleL' (standing),
 // 'atkF' | 'atkB' | 'atk' | 'atkL' (5-frame swings: towards you, away, right, left),
 // 'hurt', 'down', 'win'.
 // Returns { img, ox, oy } with the feet at (ox, oy).

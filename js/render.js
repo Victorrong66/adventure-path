@@ -5,7 +5,7 @@ import { TILE } from './util.js';
 import { MAP, O } from './world.js';
 import {
   charSprite, monsterSprite, monsterFrames, propSprite, smallSprite, giantSwordSprite,
-  drawText, textWidth, drawShadow, MERCHANT_LOOK, vanSprite, boxSprite, BOX_SHAKE, BOX_OPEN, BOX_PRIZES, BOX_GIANT, BOX_BODY,
+  drawText, textWidth, drawShadow, MERCHANT_LOOK, RUN_FRAME_MS, vanSprite, boxSprite, BOX_SHAKE, BOX_OPEN, BOX_PRIZES, BOX_GIANT, BOX_BODY,
 } from './sprites.js';
 import { paintGround, sceneSprite, TALL } from './scenery.js';
 import { bladePositions, auraRadius, giantAngle, GIANT_LEN, BOX_COST, BOX_SPIN, BOX_CLAIM } from './sim.js';
@@ -415,7 +415,7 @@ export class Renderer {
     if (hit && since >= ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, 0, 'hurt');
     else if (cheer && !p.mv && since >= ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, 0, 'win'); // level up!
     else if (since < ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, since / (ATTACK_POSE * 1000), 'atk');
-    else if (p.mv || p.dash) s = charSprite(p.look, p.dir, Math.floor(now / 75));
+    else if (p.mv || p.dash) s = charSprite(p.look, p.dir, Math.floor(now / RUN_FRAME_MS));
     else {
       s = charSprite(p.look, p.dir, 0, 'idle');
       bob = Math.floor(now / 500 + (p.id.charCodeAt(1) || 0)) % 2; // breathing
