@@ -1,7 +1,7 @@
 // All the 8-bit art is generated in code: characters are composed from parts,
 // monsters and props come from little pixel templates.
 
-import { heroFrame, heroFrameCount } from './hero.js';
+import { heroFrame, heroFrameCount, hasHeroFrames } from './hero.js';
 import { MOB_FRAMES } from './mob-frames.js';
 export { loadHeroSheet } from './hero.js';
 
@@ -119,9 +119,13 @@ export function charSprite(look, facing, frame = 0, pose = 'walk') {
   else if (pose === 'atk') kind = ['atkF', 'atkB', 'atk', 'atkL'][facing] || 'atk'; // a swing for each direction
   else if (pose === 'dash') kind = facing === 3 ? 'dashL' : 'dash'; // frame = which dash frame
   else kind = pose;
+  const base = kind;
+  // the Ninja outfit (hood and all) and the bald head have their own frame sets
+  const set = OUTFITS[look.outfit] === 'Ninja' ? 'ninja:' : look.bald ? 'bald:' : '';
+  if (set && hasHeroFrames(set + kind)) kind = set + kind;
   const n = heroFrameCount(kind);
   const index = pose === 'atk' ? Math.min(n - 1, Math.floor(frame * n)) : pose === 'dash' ? Math.min(n - 1, frame) : ((frame % n) + n) % n;
-  const native = NATIVE[kind];
+  const native = NATIVE[base];
   const flip = (native === 'left' || native === 'right') && native !== (left ? 'left' : 'right');
   const key = `${look.skin}${look.hairColor}${look.outfit}${look.outfitColor}${look.bald ? 'b' : ''}|${kind}|${index}|${flip ? 1 : 0}`;
   let s = charCache.get(key);

@@ -223,6 +223,11 @@ def cut_sheet(path, anims):
                 else: runs.append((start, x))
                 start = None
         runs = [r for r in runs if sum(cols[r[0]:r[1]]) > 300]
+        if len(runs) < count and runs:
+            # frames joined by scarves or effects: they're evenly spaced, so split the row evenly
+            lo, hi = runs[0][0], runs[-1][1]
+            step = (hi - lo) / count
+            runs = [(round(lo + i * step), round(lo + (i + 1) * step)) for i in range(count)]
         assert len(runs) == count, f'{name}: expected {count} frames, found {len(runs)}: {runs}'
         nearest = lambda x: min(range(len(runs)), key=lambda i: 0 if runs[i][0] <= x < runs[i][1] else min(abs(x - runs[i][0]), abs(x - runs[i][1])))
         cells = [[] for _ in runs]
@@ -243,7 +248,29 @@ def cut_sheet(path, anims):
             run_frames[name].append(cell.crop(cell.getbbox()))
 
 cut_sheet('tools/hero-anim.png', ANIM)
-run_scale = {}  # per-animation scale overrides (none at the moment)
+run_scale = {}  # per-animation scale overrides
+# tools/hero-variants.png: the same animations drawn bald (left half) and in the full
+# ninja outfit (right half). They're stored as 'bald:<kind>' and 'ninja:<kind>'.
+def variant(prefix, x0, xm, x1, counts):
+    rows = [('idleF', 'idleR', 55, 152), ('idleB', 'idleL', 195, 292), ('front', 'side', 330, 425),
+            ('back', 'sideL', 470, 567), ('atk', 'atkL', 615, 712), ('atkB', 'atkF', 742, 857), ('dash', 'dashL', 900, 1002)]
+    anims = {}
+    for a, b, y0, y1 in rows:
+        anims[prefix + a] = ((x0, y0, xm, y1),) + counts[a]
+        anims[prefix + b] = ((xm, y0, x1, y1),) + counts[b]
+    cut_sheet('tools/hero-variants.png', anims)
+    k = 34 / (sum(f.height for f in run_frames[prefix + 'front']) / len(run_frames[prefix + 'front']))
+    for n in anims: run_scale[n] = k
+VARIANT_NAMES = []
+for prefix, x0, xm, x1, counts in (
+    ('bald:', 10, 413, 768, {'idleF': (6, 6), 'idleR': (5, 5), 'idleB': (6, 6), 'idleL': (5, 5), 'front': (6, 6), 'side': (5, 5),
+                             'back': (6, 6), 'sideL': (5, 5), 'atk': (5, 5), 'atkL': (4, 3), 'atkB': (4, 4), 'atkF': (3, 3),
+                             'dash': (4, 4), 'dashL': (4, 4)}),
+    ('ninja:', 785, 1195, 1536, {'idleF': (6, 6), 'idleR': (5, 5), 'idleB': (6, 6), 'idleL': (5, 5), 'front': (6, 6), 'side': (5, 5),
+                                 'back': (6, 6), 'sideL': (5, 5), 'atk': (5, 5), 'atkL': (4, 4), 'atkB': (4, 4), 'atkF': (3, 3),
+                                 'dash': (4, 4), 'dashL': (4, 4)})):
+    variant(prefix, x0, xm, x1, counts)
+    VARIANT_NAMES += [prefix + k for k in counts]
 k_run = 34 / (sum(f.height for f in run_frames['front']) / len(run_frames['front']))
 
 # Bottom row: a 3-frame swing to the right (mirrored for the left), knocked dizzy,
@@ -265,7 +292,7 @@ assert len(cells) == 6, f'expected 6 poses on the bottom row, found {len(cells)}
 run_frames['dizzy'] = [cells[3]]
 run_frames['down'] = [cells[4]]
 run_frames['win'] = [cells[5]]
-for name in ('idleF', 'idleR', 'idleL', 'idleB', 'front', 'side', 'sideL', 'back', 'atk', 'atkL', 'atkF', 'atkB', 'dash', 'dashL', 'dizzy', 'down', 'win'):
+for name in ('idleF', 'idleR', 'idleL', 'idleB', 'front', 'side', 'sideL', 'back', 'atk', 'atkL', 'atkF', 'atkB', 'dash', 'dashL', 'dizzy', 'down', 'win', *VARIANT_NAMES):
     for cell in run_frames[name]:
         k = k_old if name in ('dizzy', 'down', 'win') else run_scale.get(name, k_run)
         sm = cell.resize((max(1, round(cell.width * k)), max(1, round(cell.height * k))), Image.BOX)
@@ -274,11 +301,15 @@ for name in ('idleF', 'idleR', 'idleL', 'idleB', 'front', 'side', 'sideL', 'back
             for x in range(sm.width):
                 rr, gg, bb, a = px[x, y]
                 if a <= 140: px[x, y] = (0, 0, 0, 0); continue
-                px[x, y] = (rr, gg, bb, ROLE[classify(rr, gg, bb, x, y, sm.width, sm.height, name)])
+                role = classify(rr, gg, bb, x, y, sm.width, sm.height, name.split(':')[-1])
+                if name.startswith('bald:') and role == 'hair': role = 'skin'  # no hair to recolour
+                if name.startswith('ninja:') and role != 'skin': role = 'keep'  # the ninja outfit keeps its colours
+                px[x, y] = (rr, gg, bb, ROLE[role])
         frames.append((name, sm))
 
 # pack into one strip, bottoms aligned; record each frame's foot anchor
 def anchor(f, name):
+    name = name.split(':')[-1]
     if name == 'down': return f.width // 2
     px = f.load(); xs = []
     rows = range(f.height - 3, f.height) if name.startswith('atk') or name.startswith('dash') or name in ('win', 'dizzy') else range(int(f.height * 0.25))

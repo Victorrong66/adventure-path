@@ -60,6 +60,7 @@ const TUNIC = {
 // 'hurt', 'down', 'win'.
 // Returns { img, ox, oy } with the feet at (ox, oy).
 export const heroFrameCount = (kind) => HERO_FRAMES[kind].length;
+export const hasHeroFrames = (kind) => !!HERO_FRAMES[kind];
 
 export function heroFrame(look, kind, index, flip) {
   const list = HERO_FRAMES[kind];
@@ -93,8 +94,11 @@ export function heroFrame(look, kind, index, flip) {
       roles[o >> 2] = a;
     }
   }
-  if (ninja) ninjaMask(dst, roles, w, h); // (before going bald, while only the face is skin)
-  if (look.bald) makeBald(dst, roles, w, h, rgb(look.skin));
+  // Bald and the ninja outfit have their own drawn frames ('bald:...', 'ninja:...'); for
+  // poses those sheets don't have, the head is reshaped / masked instead.
+  const drawn = kind.includes(':');
+  if (ninja && !drawn) ninjaMask(dst, roles, w, h); // (before going bald, while only the face is skin)
+  if (look.bald && !drawn && !ninja) makeBald(dst, roles, w, h, rgb(look.skin));
   g.putImageData(out, 0, 0);
   // frames are anchored on the head, so the hero doesn't wobble while walking
   return { img: c, ox: flip ? w - 1 - footX : footX, oy: h - 1 };
