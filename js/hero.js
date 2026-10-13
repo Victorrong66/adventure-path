@@ -1,5 +1,5 @@
 // Heroes come from sprite sheets (assets/hero.png, built from tools/hero-sheet.png
-// and tools/hero-swing.png by tools/build-hero.py) and are recoloured per player:
+// tools/hero-anim.png and tools/hero-run.png by tools/build-hero.py) and are recoloured per player:
 // the cloak takes the outfit colour, hair and skin take the player's picks, and
 // the leather/tunic is tinted by the outfit type.
 //

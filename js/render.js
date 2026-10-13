@@ -15,6 +15,7 @@ const DETAIL = 2;
 const ATTACK_POSE = 0.42; // seconds a sword swing lasts (wind-up, slash, follow-through)
 const DIZZY_MS = 1200;    // a downed hero sees stars this long before lying flat
 const WIN_POSE_MS = 2000; // victory pose after a wave is cleared
+const DASH_POSE_MS = 300; // the 5-frame dash attack pose plays over this long
 
 export class Renderer {
   constructor(canvas) {
@@ -28,6 +29,7 @@ export class Renderer {
     this.attackAt = new Map(); // player id -> when they last swung (performance.now)
     this.trails = new Map();   // player id -> recent dash positions, for afterimages
     this.downAt = new Map();   // player id -> when they went down (performance.now)
+    this.dashAt = new Map();   // player id -> when their dash started (performance.now)
     this.winUntil = 0;         // victory pose until this time (performance.now)
     this.resize();
     addEventListener('resize', () => this.resize());
@@ -419,10 +421,15 @@ export class Renderer {
     const hit = this.fx.some((f) => f.t === 'flash' && f.id === p.id);
     let bob = 0;
     const cheer = this.fx.some((f) => f.t === 'lvl' && f.id === p.id);
+    // dash attack pose (left/right; up/down dashes keep running), from the moment the dash starts
+    if (p.dash && !this.dashAt.has(p.id)) this.dashAt.set(p.id, now);
+    if (!p.dash && now - (this.dashAt.get(p.id) || 0) > DASH_POSE_MS) this.dashAt.delete(p.id);
+    const dashing = this.dashAt.has(p.id) && now - this.dashAt.get(p.id) < DASH_POSE_MS && (p.dir === 2 || p.dir === 3);
     if (hit && since >= ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, 0, 'hurt');
     else if (now < this.winUntil && since >= ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, 0, 'win'); // wave cleared!
     else if (cheer && !p.mv && since >= ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, 0, 'win'); // level up!
     else if (since < ATTACK_POSE * 1000) s = charSprite(p.look, p.dir, since / (ATTACK_POSE * 1000), 'atk');
+    else if (dashing) s = charSprite(p.look, p.dir, Math.floor((now - this.dashAt.get(p.id)) / (DASH_POSE_MS / 5)), 'dash');
     else if (p.mv || p.dash) s = charSprite(p.look, p.dir, Math.floor(now / RUN_FRAME_MS));
     else {
       s = charSprite(p.look, p.dir, 0, 'idle');
