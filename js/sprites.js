@@ -22,7 +22,7 @@ export const SKINS = ['#ffdcb4', '#f0c08c', '#d8a070', '#b87848', '#8c5430', '#5
 // (Saved characters keep their numbers, so each list keeps its length.)
 export const HAIR_STYLES = ['Spiky', 'Bald']; // look.bald: 0 or 1
 export const HAIR_COLORS = ['#2a2224', '#5a361e', '#8a5228', '#c4562a', '#e0b048', '#f0e0b0', '#4a78d0', '#e07aa8'];
-export const OUTFITS = ['Adventurer', 'Squire', 'Apprentice', 'Ranger', 'Dragonhide', 'Royal', 'Ninja'];
+export const OUTFITS = ['Adventurer', 'Squire', 'Apprentice', 'Ranger', 'Dragonhide', 'Royal', 'Ninja', 'Classic Ninja'];
 // Storybook colours: red, blue, green, gold, teal, purple, orange, cream
 export const OUTFIT_COLORS = ['#c8402e', '#3a6ec0', '#4a9a3e', '#e0a830', '#2a9a9a', '#7a4ab0', '#e07028', '#e6e0cc', '#3a3a46'];
 export const EXTRAS = ['None', 'Goggles', 'Headband', 'Cap', 'Beanie'];
@@ -111,6 +111,7 @@ const NATIVE = {
 // pose: 'walk' (frame = any running count; RUN_FRAME_MS per frame), 'dash' (frame 0..4), 'idle', 'atk' (frame = swing progress
 // 0..1), 'hurt', 'down' or 'win'.
 export function charSprite(look, facing, frame = 0, pose = 'walk') {
+  if (OUTFITS[look.outfit] === 'Classic Ninja') return classicNinja(look, facing, frame, pose);
   const left = facing === 3 || (facing === 1 && pose !== 'walk' && pose !== 'idle');
   let kind;
   // running: a 4-frame run cycle per direction; standing: one still frame per direction
@@ -144,6 +145,97 @@ export function charSprite(look, facing, frame = 0, pose = 'walk') {
       img: f.img, ox: f.ox, oy: f.oy, w: f.img.width, h: f.img.height,
       // red-tinted copy for the moment a hero gets hit
       hurt() { return red || (red = tinted(f.img, 'rgba(255,40,40,0.6)')); },
+    };
+    charCache.set(key, s);
+  }
+  return s;
+}
+
+// ---------------------------------------------------------------- Classic Ninja
+// One of the game's original characters (drawn in code, before the sprite sheets): a
+// small ninja with a headband and mask. Drawn at 1.5x so it matches the other heroes
+// (3 detail pixels per art pixel, still crisp). Facing left is the right side mirrored.
+const CLASSIC_SCALE = 1.5;
+const CLASSIC_HAIR = {
+  down: ['..H.H.H.H.', '..HHHHHHH.', '.HHHHHHHH.', '..HHhHhH..', '..H....H..'],
+  up: ['..H.H.H.H.', '..HHHHHHH.', '.HHHHHHHH.', '..HHHHHH..', '..HHHHHH..', '..HHHHHH..', '..hHHHHh..'],
+  side: ['.H.H.H....', '.HHHHHHH..', 'HHHHHHHHH.', '.HHHHH....', '..HHH.....', '..hH......'],
+};
+// dir: 0 down, 1 up, 2 side (facing right). frame 0..3 (walk).
+function buildClassicNinja(look, dir, frame) {
+  const OY = 2;
+  const { c, g } = mk(14, 21);
+  const p = (x, y, col) => { g.fillStyle = col; g.fillRect(x + 1, y + OY, 1, 1); };
+  const r = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x + 1, y + OY, w, h); };
+  const skin = SKINS[look.skin] || SKINS[0], skinD = shade(skin, -0.15);
+  const hair = HAIR_COLORS[look.hairColor] || HAIR_COLORS[0], hairD = shade(hair, -0.3);
+  const out = OUTFIT_COLORS[look.outfitColor] || OUTFIT_COLORS[0];
+  const cloth = '#2c2c3c', clothD = '#1a1a26';
+  const lift = frame === 1 ? 1 : frame === 3 ? 2 : 0;
+  const side = dir === 2;
+  // legs
+  if (!side) {
+    const lY = lift === 1 ? -1 : 0, rY = lift === 2 ? -1 : 0;
+    r(4, 13 + lY, 2, 3, cloth); r(4, 16 + lY, 2, 1, clothD);
+    r(6, 13 + rY, 2, 3, cloth); r(6, 16 + rY, 2, 1, clothD);
+  } else if (lift) {
+    r(3, 13, 2, 3, cloth); r(2, 16, 3, 1, clothD);
+    r(7, 13, 2, 3, shade(cloth, -0.15)); r(7, 16, 3, 1, clothD);
+  } else {
+    r(5, 13, 2, 3, cloth); r(5, 16, 3, 1, clothD);
+  }
+  // torso and arms
+  r(3, 8, 6, 5, cloth); r(3, 12, 6, 1, clothD);
+  if (!side) {
+    const swing = lift === 1 ? 1 : lift === 2 ? -1 : 0;
+    r(2, 8, 1, 3 + Math.max(0, swing), cloth); p(2, 11 + Math.max(0, swing), skin);
+    r(9, 8, 1, 3 + Math.max(0, -swing), cloth); p(9, 11 + Math.max(0, -swing), skin);
+  }
+  // head
+  r(3, 2, 6, 6, skin); r(3, 7, 6, 1, skinD);
+  if (dir === 0) { p(4, 5, '#201828'); p(7, 5, '#201828'); }
+  if (side) p(7, 5, '#201828');
+  // belt and mask
+  r(3, 11, 6, 1, out);
+  if (dir === 0) r(3, 6, 6, 2, cloth);
+  if (side) r(5, 6, 4, 2, cloth);
+  if (side) { const hx = lift === 1 ? 7 : lift === 2 ? 4 : 5; r(5, 8, 2, 3, shade(cloth, -0.1)); r(hx, 11, 2, 1, skin); }
+  // hair (spiky, or none when bald)
+  if (!look.bald) {
+    CLASSIC_HAIR[dir === 0 ? 'down' : dir === 1 ? 'up' : 'side'].forEach((row, y) => {
+      for (let x = 0; x < row.length; x++) {
+        if (row[x] === 'H') p(x + 1, y, hair);
+        else if (row[x] === 'h') p(x + 1, y, hairD);
+      }
+    });
+  }
+  // headband, with its tails flying behind
+  r(3, 3, 6, 1, out);
+  if (dir === 1) { p(5, 4, out); p(6, 4, out); }
+  if (side) { p(2, 3, out); p(1, 4, out); }
+  return outline(c);
+}
+
+function classicNinja(look, facing, frame, pose) {
+  // the original art only has its 4-frame walk: standing and other poses use frame 0
+  const f = pose === 'walk' ? ((frame % 4) + 4) % 4 : 0;
+  const key = `classic|${look.skin}${look.hairColor}${look.outfitColor}${look.bald ? 'b' : ''}|${facing}|${f}|${pose === 'down' ? 'd' : ''}`;
+  let s = charCache.get(key);
+  if (!s) {
+    const dir = facing === 3 ? 2 : facing;
+    let img = buildClassicNinja(look, dir, f);
+    if (facing === 3) img = flipped(img);
+    let ox = 7, oy = 19;
+    if (pose === 'down') { // knocked out: lying on its side
+      const { c, g } = mk(img.height, img.width);
+      g.translate(c.width, 0); g.rotate(Math.PI / 2); g.drawImage(img, 0, 0);
+      img = c; ox = c.width / 2; oy = c.height - 2;
+    }
+    let red = null;
+    const k = CLASSIC_SCALE;
+    s = {
+      img, ox: ox * k, oy: oy * k, w: img.width * k, h: img.height * k,
+      hurt() { return red || (red = tinted(img, 'rgba(255,40,40,0.6)')); },
     };
     charCache.set(key, s);
   }
