@@ -907,7 +907,9 @@ export class Sim {
       let carrier = c.carrier && this.players.get(c.carrier);
       if (c.carrier && (!carrier || carrier.dead)) { this.dropCard(c, carrier || c); carrier = null; }
       if (!carrier) {
-        const taker = alive.find((o) => Math.hypot(o.x - c.x, o.y - c.y) < 0.7);
+        // (alive was listed at the start of the tick: skip anyone downed since, e.g. the
+        // card's owner, who is standing right on it)
+        const taker = alive.find((o) => !o.dead && o.id !== id && Math.hypot(o.x - c.x, o.y - c.y) < 0.7);
         if (!taker) continue;
         c.carrier = taker.id; carrier = taker;
         this.emit({ k: 'card', id: taker.id, m: `${taker.name} picked up ${p.name}'s card` });
