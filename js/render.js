@@ -4,11 +4,11 @@
 import { TILE } from './util.js';
 import { MAP, O } from './world.js';
 import {
-  charSprite, monsterSprite, monsterFrames, propSprite, smallSprite, giantSwordSprite,
+  charSprite, monsterSprite, monsterFrames, monsterAnim, animFrames, propSprite, smallSprite, giantSwordSprite,
   drawText, textWidth, drawShadow, MERCHANT_LOOK, RUN_FRAME_MS, vanSprite, boxSprite, BOX_SHAKE, BOX_OPEN, BOX_PRIZES, BOX_GIANT, BOX_BODY,
 } from './sprites.js';
 import { paintGround, sceneSprite, TALL } from './scenery.js';
-import { bladePositions, auraRadius, giantAngle, GIANT_LEN, BOX_COST, BOX_SPIN, BOX_CLAIM } from './sim.js';
+import { bladePositions, auraRadius, giantAngle, GIANT_LEN, BOX_COST, BOX_SPIN, BOX_CLAIM, SMASH_TIME, CHARGE_TIME } from './sim.js';
 
 const BG = '#0c1a10';
 const DETAIL = 2;
@@ -65,6 +65,7 @@ export class Renderer {
     switch (e.k) {
       case 'dmg': this.addFx({ t: 'num', x: e.x, y: e.y, v: e.v, life: 0.7, z: 0 }); break;
       case 'die':
+        if (e.t === 'ogre' && animFrames('ogre', 'die')) this.addFx({ t: 'corpse', type: 'ogre', d: e.d || 1, x: e.x, y: e.y, life: 3, max: 3 });
         for (let i = 0; i < 6; i++) this.addFx({ t: 'part', x: e.x, y: e.y, vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3, z: 6, vz: 20 + Math.random() * 20, life: 0.5, c: { slime: '#3cb83c', imp: '#d83c2c', shroomling: '#e84838', golem: '#8c8068', bat: '#7c3c6c', goblin: '#7c8c3c' }[e.t] || '#e8e8d8' });
         if (e.t === 'ogre') this.shake = 0.6;
         break;
@@ -183,6 +184,16 @@ export class Renderer {
         case 'enemy': this.drawEnemy(it.e, time); break;
         case 'player': this.drawPlayer(it.e, view, time); break;
         case 'proj': {
+          if (it.e.kind === 'fire' && animFrames('fireball', 'fly')) {
+            // the Devil's fireball: its art flies left, so turn it to face where it's going
+            const f = monsterAnim('fireball', 'fly', -1, Math.floor(time * 12 + it.e.id) % animFrames('fireball', 'fly'));
+            g.save();
+            g.translate(this.sx(it.e.x, it.e.y), this.sy(it.e.x, it.e.y) - 6);
+            g.rotate(Math.atan2(it.e.vy, it.e.vx) + Math.PI);
+            g.drawImage(f.img, -f.w * 0.3, -f.h / 2, f.w, f.h);
+            g.restore();
+            break;
+          }
           const s = smallSprite(it.e.kind);
           g.drawImage(s.img, this.sx(it.e.x, it.e.y) - s.ox, this.sy(it.e.x, it.e.y) - 6 - s.oy);
           break;
@@ -384,12 +395,23 @@ export class Renderer {
     const x = this.sx(e.x, e.y), y = this.sy(e.x, e.y);
     const nf = monsterFrames(e.type);
     const frame = nf > 1 ? Math.floor(time * (e.type === 'bat' ? 10 : nf >= 5 ? 8 : 4) + e.id) % nf : 0;
-    const s = monsterSprite(e.type, e.dir || 1, frame);
+    // special animations: the Ogre King's charge swing, ground smash, flinch and idle;
+    // the Devil shooting a fireball
+    const since = (performance.now() - (e.stAt || 0)) / 1000;
+    const play = (anim, secs) => monsterAnim(e.type, anim, e.dir || 1, Math.floor(since / secs * animFrames(e.type, anim)));
+    let s = null;
+    if (e.st === 3) s = play('smash', SMASH_TIME);
+    else if (e.st === 2) s = play('swing', CHARGE_TIME);
+    else if (e.st === 4) s = play((e.dir || 1) < 0 ? 'shootL' : 'shootR', 0.45);
+    else if (e.flash && e.type === 'ogre') s = monsterAnim(e.type, 'hurt', e.dir || 1, Math.floor(time * 12) % 2);
+    else if (e.st === 1) s = monsterAnim(e.type, 'idle', e.dir || 1, Math.floor(time * 6) % Math.max(1, animFrames(e.type, 'idle')));
+    s = s || monsterSprite(e.type, e.dir || 1, frame);
     const fly = e.type === 'bat' || e.type === 'ghost';
     const bob = fly ? Math.round(Math.sin(time * 4 + e.id) * 2) - 6 : (nf === 1 ? (Math.floor(time * 4 + e.id) % 2) : 0);
     drawShadow(g, x, y, e.type === 'ogre' ? 18 : e.type === 'golem' ? 16 : 8);
     if (e.type === 'ghost') g.globalAlpha = 0.75;
-    g.drawImage(e.flash ? s.white : s.img, x - s.ox, y - s.oy + bob, s.w || s.img.width, s.h || s.img.height);
+    const flashWhite = e.flash && !(e.type === 'ogre' && animFrames('ogre', 'hurt'));
+    g.drawImage(flashWhite ? s.white : s.img, x - s.ox, y - s.oy + bob, s.w || s.img.width, s.h || s.img.height);
     g.globalAlpha = 1;
     if (e.hp < e.maxHp && !e.boss && e.type !== 'ogre') {
       const w = 10;
@@ -556,6 +578,23 @@ export class Renderer {
             g.fillStyle = r === f.r * 0.82 ? '#ffffff' : edge;
             g.fillRect(px, py, 2, 2);
           }
+        }
+      } else if (f.t === 'burst') {
+        // a fireball fizzling out
+        const n = animFrames('fireball', 'burst'), k = Math.min(n - 1, Math.floor((1 - f.life / 0.3) * n));
+        const s = monsterAnim('fireball', 'burst', -1, k);
+        if (s) {
+          g.save(); g.translate(this.sx(f.x, f.y), this.sy(f.x, f.y) - 6); g.rotate(f.a + Math.PI);
+          g.drawImage(s.img, -s.w * 0.3, -s.h / 2, s.w, s.h); g.restore();
+        }
+      } else if (f.t === 'corpse') {
+        // the Ogre King keels over (then fades away)
+        const t = f.max - f.life, n = animFrames(f.type, 'die');
+        const s = monsterAnim(f.type, 'die', f.d, Math.min(n - 1, Math.floor(t / 0.9 * n)));
+        if (s) {
+          g.globalAlpha = Math.min(1, f.life / 0.8);
+          g.drawImage(s.img, this.sx(f.x, f.y) - s.ox, this.sy(f.x, f.y) - s.oy, s.w, s.h);
+          g.globalAlpha = 1;
         }
       } else if (f.t === 'quake') {
         // Thunder Hammer: a ring of lightning blue rushing out along the ground

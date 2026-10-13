@@ -49,6 +49,9 @@ export const swordReach = (L) => 1.6 + 0.3 * ((L || 1) - 1);
 export const slashCooldown = (L) => SLASH_CD - 0.03 * ((L || 1) - 1);
 // Giant Sword power-up: a huge blade spins around you for a few seconds.
 export const GIANT_TIME = 5;
+// The Ogre King's ground smash: how long it takes, when in it the club lands, and its reach
+export const SMASH_TIME = 1.2, SMASH_HIT = 0.6, SMASH_R = 2.8;
+export const CHARGE_TIME = 0.7;
 // Mystery Box: spend gold, it spins, and out comes the Giant Sword.
 export const BOX_COST = 30;
 export const BOX_SPIN = 3;       // seconds from opening the box to the prize
@@ -611,7 +614,7 @@ export class Sim {
     e.dead = true;
     this.save.kills = (this.save.kills || 0) + 1;
     const def = ENEMY[e.type];
-    this.emit({ k: 'die', x: r2(e.x), y: r2(e.y), t: e.type });
+    this.emit({ k: 'die', x: r2(e.x), y: r2(e.y), t: e.type, d: e.dir });
     const xp = def.xp;
     const kind = xp >= 10 ? 'xp3' : xp >= 3 ? 'xp2' : 'xp';
     this.addPickup(kind, e.x, e.y, xp);
@@ -812,16 +815,28 @@ export class Sim {
           if (d < 3.5) { mx = -ux; my = -uy; } else if (d > 5.5) { mx = ux; my = uy; } else { mx = -uy * 0.6; my = ux * 0.6; }
           e.cd -= dt;
           if (e.cd <= 0 && d < 9) {
-            e.cd = 2.4;
+            e.cd = 2.4; e.shotAt = this.t;
             this.projs.push({ id: this.nid++, kind: 'fire', x: e.x, y: e.y, vx: ux * 4.5, vy: uy * 4.5, dmg: e.dmg + 4, life: 2.5, enemy: true });
           }
         } else if (e.boss) {
           e.cd -= dt;
-          if (e.charge > 0) {
+          e.smashCd = (e.smashCd ?? 2) - dt;
+          if (e.smash > 0) {
+            // Ground smash: stand still, raise the club, slam it down on everyone close
+            e.smash -= dt;
+            if (!e.smashHit && e.smash <= SMASH_HIT) {
+              e.smashHit = true;
+              for (const p of alive) if (Math.hypot(p.x - e.x, p.y - e.y) < SMASH_R) this.hurtPlayer(p, Math.round(e.dmg * 1.5));
+              this.emit({ k: 'quake', x: r2(e.x), y: r2(e.y), r: SMASH_R });
+            }
+          } else if (e.charge > 0) {
             e.charge -= dt; mx = e.cvx; my = e.cvy;
+          } else if (e.smashCd <= 0 && d < 2.6) {
+            e.smash = SMASH_TIME; e.smashHit = false; e.smashCd = 4.5;
+            this.emit({ k: 'sfx', s: 'roar' });
           } else {
             mx = ux; my = uy;
-            if (e.cd <= 0 && d < 8) { e.charge = 0.7; e.cvx = ux * 4; e.cvy = uy * 4; e.cd = 4.5; this.emit({ k: 'sfx', s: 'roar' }); }
+            if (e.cd <= 0 && d < 8) { e.charge = CHARGE_TIME; e.cvx = ux * 4; e.cvy = uy * 4; e.cd = 4.5; this.emit({ k: 'sfx', s: 'roar' }); }
           }
         } else { mx = ux; my = uy; }
         // Contact damage
@@ -955,6 +970,7 @@ export class Sim {
 
   snapshot() {
     const ri = (v) => Math.round(v * 100);
+    const anyone = this.party().some((p) => !p.dead);
     const pl = [];
     for (const p of this.party()) {
       pl.push([p.id, ri(p.x), ri(p.y), p.dir, p.mv ? 1 : 0, Math.ceil(p.hp), p.maxHp, p.dead ? 1 : 0,
@@ -966,13 +982,22 @@ export class Sim {
       pt: Math.ceil(this.phaseT), left: this.spawnLeft + this.enemies.length, k: this.save.kills,
       pz: this.pauseInfo(),
       pl,
-      en: this.enemies.map((e) => [e.id, ENEMY_TYPES.indexOf(e.type), ri(e.x), ri(e.y), e.dir, e.flash > 0 ? 1 : 0, Math.max(0, Math.ceil(e.hp)), e.maxHp]),
+      en: this.enemies.map((e) => [e.id, ENEMY_TYPES.indexOf(e.type), ri(e.x), ri(e.y), e.dir, e.flash > 0 ? 1 : 0, Math.max(0, Math.ceil(e.hp)), e.maxHp, this.enemyState(e, anyone)]),
       pr: this.projs.map((q) => [q.id, PROJ_KINDS.indexOf(q.kind), ri(q.x), ri(q.y), ri(q.vx), ri(q.vy)]),
       pk: this.pickups.map((k) => [k.id, PICKUP_KINDS.indexOf(k.kind), ri(k.x), ri(k.y)]),
       rv: this.rules.revive,
       bx: this.box.stage ? [this.box.user, Math.ceil(this.box.t * 10), this.box.stage === 'ready' ? 1 : 0, this.box.prize] : 0,
       cd: [...this.cards].map(([id, c]) => [id, ri(c.x), ri(c.y), c.carrier || 0, Math.round(c.boot * 100), c.atVan ? 1 : 0]),
     };
+  }
+
+  // What a monster is doing, for its animation: 0 walking, 1 standing (nobody to chase),
+  // 2 charging (Ogre King's swing), 3 ground smash, 4 shooting a fireball.
+  enemyState(e, anyone) {
+    if (e.smash > 0) return 3;
+    if (e.charge > 0) return 2;
+    if (e.shotAt !== undefined && this.t - e.shotAt < 0.45) return 4;
+    return anyone ? 0 : 1;
   }
 
   // Who's picking a level-up (null if nobody): n = their names, t = seconds until one

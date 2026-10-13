@@ -162,11 +162,15 @@ export class Game {
       for (const id of map.keys()) if (!ids.has(id)) map.delete(id);
     };
     syncMap(C.enemies, s.en, (a, cur) => {
-      const [id, ti, x, y, dir, flash, hp, maxHp] = a;
+      const [id, ti, x, y, dir, flash, hp, maxHp, st] = a;
       const e = cur || { id, x: x / 100, y: y / 100 };
       const type = ENEMY_TYPES[ti];
-      return Object.assign(e, { type, tx: x / 100, ty: y / 100, dir, flash, hp, maxHp, boss: type === 'ogre' });
+      if (e.st !== (st || 0)) e.stAt = performance.now(); // when it started what it's doing (for its animation)
+      return Object.assign(e, { type, tx: x / 100, ty: y / 100, dir, flash, hp, maxHp, boss: type === 'ogre', st: st || 0 });
     });
+    // fireballs that are gone burst where they were
+    const still = new Set(s.pr.map((a) => a[0]));
+    for (const q of C.projs.values()) if (!still.has(q.id) && q.kind === 'fire') this.renderer.addFx({ t: 'burst', x: q.x, y: q.y, a: Math.atan2(q.vy, q.vx), life: 0.3 });
     syncMap(C.projs, s.pr, (a, cur) => {
       const [id, ki, x, y, vx, vy] = a;
       const q = cur || { id };

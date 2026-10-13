@@ -16,7 +16,7 @@ waves of monsters together.
   upgrades and gold are saved inside the host's world too. You can export a save to a file and
   import it on another computer, so someone else can take over hosting.
 - **Swarm combat:** auto-firing weapons, waves that get harder, an Ogre King boss every 5 waves
-  (beating it saves a checkpoint), level-up upgrades (level-ups add up during a wave and everyone picks them once it's cleared; the countdown to the next wave starts when everyone has picked), monsters drawn from tools/mobs.png (slimes, goblins, skeletons, shroomlings, bats and big rock golems), monsters that get tougher and hit harder every wave, reviving downed friends, and a merchant
+  (beating it saves a checkpoint), level-up upgrades (level-ups add up during a wave and everyone picks them once it's cleared; the countdown to the next wave starts when everyone has picked), monsters drawn from tools/mobs.png (slimes, goblins, skeletons, shroomlings, bats and big rock golems), fireball-throwing Devils (tools/devil.png) and the Ogre King boss (tools/ogre.png), who charges with a club swing and stops to smash the ground when you get close, monsters that get tougher and hit harder every wave, reviving downed friends, and a merchant
   at camp who sells permanent upgrades for gold (the shop is private: the game keeps going for
   everyone else).
 - **Joining mid-game:** someone who joins during a wave watches until it's over, then joins the
