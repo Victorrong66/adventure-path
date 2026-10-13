@@ -271,6 +271,12 @@ for prefix, x0, xm, x1, counts in (
                                  'dash': (4, 4), 'dashL': (4, 4)})):
     variant(prefix, x0, xm, x1, counts)
     VARIANT_NAMES += [prefix + k for k in counts]
+# tools/hero-baldninja.png: the ninja outfit on a bald hero, laid out like hero-anim.png.
+anims = {'baldninja:' + k: v for k, v in ANIM.items()}
+cut_sheet('tools/hero-baldninja.png', anims)
+k = 34 / (sum(f.height for f in run_frames['baldninja:front']) / len(run_frames['baldninja:front']))
+for n in anims: run_scale[n] = k
+VARIANT_NAMES += list(anims)
 k_run = 34 / (sum(f.height for f in run_frames['front']) / len(run_frames['front']))
 
 # Bottom row: a 3-frame swing to the right (mirrored for the left), knocked dizzy,
@@ -303,7 +309,8 @@ for name in ('idleF', 'idleR', 'idleL', 'idleB', 'front', 'side', 'sideL', 'back
                 if a <= 140: px[x, y] = (0, 0, 0, 0); continue
                 role = classify(rr, gg, bb, x, y, sm.width, sm.height, name.split(':')[-1])
                 if name.startswith('bald:') and role == 'hair': role = 'skin'  # no hair to recolour
-                if name.startswith('ninja:') and role != 'skin': role = 'keep'  # the ninja outfit keeps its colours
+                if name.startswith('baldninja:') and role == 'hair': role = 'skin'
+                if name.startswith(('ninja:', 'baldninja:')) and role != 'skin': role = 'keep'  # the ninja outfit keeps its colours
                 px[x, y] = (rr, gg, bb, ROLE[role])
         frames.append((name, sm))
 

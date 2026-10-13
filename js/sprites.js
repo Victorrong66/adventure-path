@@ -120,8 +120,9 @@ export function charSprite(look, facing, frame = 0, pose = 'walk') {
   else if (pose === 'dash') kind = facing === 3 ? 'dashL' : 'dash'; // frame = which dash frame
   else kind = pose;
   const base = kind;
-  // the Ninja outfit (hood and all) and the bald head have their own frame sets
-  const set = OUTFITS[look.outfit] === 'Ninja' ? 'ninja:' : look.bald ? 'bald:' : '';
+  // the Ninja outfit (hooded, or on a bald head) and the bald head have their own frame sets
+  const ninja = OUTFITS[look.outfit] === 'Ninja';
+  const set = ninja ? (look.bald ? 'baldninja:' : 'ninja:') : look.bald ? 'bald:' : '';
   if (set && hasHeroFrames(set + kind)) kind = set + kind;
   const n = heroFrameCount(kind);
   const index = pose === 'atk' ? Math.min(n - 1, Math.floor(frame * n)) : pose === 'dash' ? Math.min(n - 1, frame) : ((frame % n) + n) % n;
