@@ -230,3 +230,8 @@ textarea {
 }
 /* Short (landscape phone) screens: keep big announcements clear of the chat lines at the top */
 @media (max-height: 500px) { .announce { top: 46%; font-size: 18px; } }
+/* Mystery Box button: glows, and pulses when your prize is ready to take */
+#act-box { background: #1c4a78; box-shadow: 0 0 0 3px #78e8ff, 0 0 12px #78e8ff; }
+#act-box:disabled { box-shadow: 0 0 0 3px var(--edge); }
+#act-box.take { background: #2c7c3c; animation: box-pulse .6s ease-in-out infinite alternate; }
+@keyframes box-pulse { from { box-shadow: 0 0 0 3px #f8d838, 0 0 6px #f8d838; } to { box-shadow: 0 0 0 3px #f8d838, 0 0 18px #f8d838; } }

@@ -32,9 +32,11 @@ waves of monsters together.
   friends when they join. It's never uploaded anywhere else, and **Reset** puts the normal
   monsters back.
 - **Sword:** slash with J/K, the mouse, or the Attack button. It levels up (longer reach, more
-  damage, faster swings) through level-up picks. Spin the **Mystery Box** next to the Reboot Van
-  spot at camp (30 gold, F) to get the **Giant Sword**: an absurdly long blade (9 tiles!) spins around you for
-  10 seconds and cuts through everything.
+  damage, faster swings) through level-up picks. Walk up to the **Mystery Box** next to the Reboot
+  Van spot at camp and press its glowing button (or F) to spin it for 30 gold. The **Giant Sword** rises out
+  and slowly sinks back in: press the button again to take it before it's gone. It's an absurdly long blade
+  (9 tiles!) that spins around you for 10 seconds and cuts through everything.
+- **Fair spawns:** monsters always appear just off every player's screen, never on top of anyone.
 - **8-bit everything:** pixel art drawn in code, a pixel font, and chiptune music and sound effects.
 
 ## Controls

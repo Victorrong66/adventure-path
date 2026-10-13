@@ -51,6 +51,7 @@ export const GIANT_TIME = 5;
 export const BOX_COST = 30;
 export const BOX_SPIN = 2.2;     // seconds of spinning before the prize
 export const BOX_SWORD = 10;     // seconds of Giant Sword it gives
+export const BOX_CLAIM = 8;      // seconds the prize hovers (sinking) before it's gone
 export const GIANT_LEN = 9;      // absurdly long, in tiles
 export const GIANT_WIDTH = 0.6;  // half-width of the blade's hit area, in tiles
 export const GIANT_SPIN = 5;     // radians per second
@@ -110,7 +111,9 @@ export class Sim {
     const rules = save.rules || {};
     this.rules = { revive: REVIVE_MODES.includes(rules.revive) ? rules.revive : 'classic' };
     this.cards = new Map(); // downed player id -> { x, y, carrier, boot }
-    this.box = { user: null, t: 0 }; // Mystery Box: who's spinning it, and for how long still
+    // Mystery Box: who spun it, 'spin' (spinning) or 'ready' (prize waiting to be
+    // taken, sinking back into the box), and seconds left in that stage.
+    this.box = { user: null, stage: '', t: 0 };
   }
 
   emit(e) { this.events.push(e); }
@@ -219,6 +222,10 @@ export class Sim {
       p.x = Math.max(1, Math.min(MAP - 1, inp.x));
       p.y = Math.max(1, Math.min(MAP - 1, inp.y));
     }
+    // How much of the world this player's screen shows (half-size, in tiles), so
+    // monsters can spawn where nobody can see them.
+    if (Number.isFinite(inp.vw)) p.vw = Math.max(4, Math.min(40, inp.vw));
+    if (Number.isFinite(inp.vh)) p.vh = Math.max(3, Math.min(40, inp.vh));
     p.dir = inp.dir | 0;
     p.mv = !!inp.mv;
     p.dash = !!inp.dash;
@@ -318,24 +325,35 @@ export class Sim {
     this.emit({ k: 'sfx', s: 'pick', id: p.id });
   }
 
+  // Press once to spin (costs gold); once the prize shows, press again to take it.
   spinBox(p) {
-    const b = this.world.box;
-    if (p.dead || this.box.user || p.gold < BOX_COST || Math.hypot(p.x - b.x, p.y - b.y) > 2.2) return;
+    const b = this.world.box, box = this.box;
+    if (p.dead || Math.hypot(p.x - b.x, p.y - b.y) > 2.2) return;
+    if (box.stage === 'ready' && box.user === p.id) {
+      box.user = null; box.stage = ''; box.t = 0;
+      p.giantT = Math.min(BOX_SWORD * 2, (p.giantT || 0) + BOX_SWORD);
+      this.emit({ k: 'giant', id: p.id, m: `${p.name} took the GIANT SWORD from the Mystery Box!` });
+      return;
+    }
+    if (box.stage || p.gold < BOX_COST) return;
     p.gold -= BOX_COST;
-    this.box.user = p.id; this.box.t = BOX_SPIN;
+    box.user = p.id; box.stage = 'spin'; box.t = BOX_SPIN;
     this.emit({ k: 'box', id: p.id, m: `${p.name} spins the Mystery Box...` });
   }
 
   updateBox(dt) {
-    if (!this.box.user) return;
-    this.box.t -= dt;
-    if (this.box.t > 0) return;
-    const p = this.players.get(this.box.user);
-    this.box.user = null;
-    if (!p) return;
-    if (p.dead) { p.gold += BOX_COST; return; } // went down mid-spin: money back
-    p.giantT = Math.min(BOX_SWORD * 2, (p.giantT || 0) + BOX_SWORD);
-    this.emit({ k: 'giant', id: p.id, m: `${p.name} got the GIANT SWORD from the Mystery Box!` });
+    const box = this.box;
+    if (!box.stage) return;
+    box.t -= dt;
+    if (box.t > 0) return;
+    if (box.stage === 'spin') {
+      box.stage = 'ready'; box.t = BOX_CLAIM;
+      this.emit({ k: 'box', id: box.user, ready: 1 });
+    } else {
+      const p = this.players.get(box.user);
+      box.user = null; box.stage = '';
+      this.emit({ k: 'msg', m: `The Giant Sword sank back into the Mystery Box${p ? ` (${p.name} didn't take it)` : ''}.` });
+    }
   }
 
   shopCost(p, item) { return item.base + item.step * (p.perm[item.id] || 0); }
@@ -459,16 +477,8 @@ export class Sim {
   }
 
   spawnEnemy(type) {
-    const alive = this.party().filter((p) => !p.dead);
-    const anchor = alive[(Math.random() * alive.length) | 0] || { x: this.world.cx, y: this.world.cy };
     const def = ENEMY[type];
-    let x = 0, y = 0;
-    for (let tries = 0; tries < 12; tries++) {
-      const a = Math.random() * Math.PI * 2, d = 11 + Math.random() * 4;
-      x = Math.max(2.6, Math.min(MAP - 2.6, anchor.x + Math.cos(a) * d));
-      y = Math.max(2.6, Math.min(MAP - 2.6, anchor.y + Math.sin(a) * d));
-      if (!this.world.hit(x, y, def.r) && !this.world.inCamp(x, y)) break;
-    }
+    const { x, y } = this.spawnSpot(def.r);
     const n = Math.max(1, this.party().length);
     const L = this.wave - 1; // monsters level up with every wave
     const hpMul = (1 + 0.3 * L) * (1 + 0.5 * (n - 1));
@@ -480,6 +490,38 @@ export class Sim {
       r: def.r, dir: 1, flash: 0, cd: 2 + Math.random() * 2, charge: 0, cvx: 0, cvy: 0,
       boss: !!def.boss, dead: false, auraT: 0, bladeT: 0,
     });
+  }
+
+  // Somewhere just off every player's screen (never on top of anyone), and not in a
+  // wall or the camp.
+  spawnSpot(r) {
+    const alive = this.party().filter((p) => !p.dead);
+    const lo = 2.6, hi = MAP - 2.6;
+    // what each player can see, plus a margin (things stand up, and the camera lags a bit)
+    const views = alive.map((p) => ({ x: p.x, y: p.y, w: (p.vw || 13) + 1.5, h: (p.vh || 8) + 2.5 }));
+    const seen = (x, y) => views.some((v) => Math.abs(x - v.x) < v.w && Math.abs(y - v.y) < v.h);
+    const near = (x, y) => alive.some((p) => Math.hypot(p.x - x, p.y - y) < 6);
+    const good = (x, y) => !seen(x, y) && !near(x, y) && !this.world.hit(x, y, r) && !this.world.inCamp(x, y);
+    // Try just outside a random player's view, so monsters arrive from off-screen
+    // close enough to join the fight quickly.
+    for (let tries = 0; tries < 30 && views.length; tries++) {
+      const v = views[(Math.random() * views.length) | 0];
+      const a = Math.random() * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
+      const edge = Math.min(Math.abs(c) > 1e-3 ? v.w / Math.abs(c) : 1e9, Math.abs(s) > 1e-3 ? v.h / Math.abs(s) : 1e9);
+      const d = edge + 0.5 + Math.random() * 3;
+      const x = Math.max(lo, Math.min(hi, v.x + c * d)), y = Math.max(lo, Math.min(hi, v.y + s * d));
+      if (good(x, y)) return { x, y };
+    }
+    // Otherwise anywhere on the map nobody can see.
+    let best = null, bestD = -1;
+    for (let tries = 0; tries < 60; tries++) {
+      const x = lo + Math.random() * (hi - lo), y = lo + Math.random() * (hi - lo);
+      if (good(x, y)) return { x, y };
+      if (this.world.hit(x, y, r)) continue;
+      const d = Math.min(...alive.map((p) => Math.hypot(p.x - x, p.y - y)), 99);
+      if (d > bestD) { bestD = d; best = { x, y }; }
+    }
+    return best || { x: lo, y: lo };
   }
 
   hitEnemy(e, dmg) {
@@ -846,7 +888,7 @@ export class Sim {
       pr: this.projs.map((q) => [q.id, PROJ_KINDS.indexOf(q.kind), ri(q.x), ri(q.y), ri(q.vx), ri(q.vy)]),
       pk: this.pickups.map((k) => [k.id, PICKUP_KINDS.indexOf(k.kind), ri(k.x), ri(k.y)]),
       rv: this.rules.revive,
-      bx: this.box.user ? [this.box.user, Math.ceil(this.box.t * 10)] : 0,
+      bx: this.box.stage ? [this.box.user, Math.ceil(this.box.t * 10), this.box.stage === 'ready' ? 1 : 0] : 0,
       cd: [...this.cards].map(([id, c]) => [id, ri(c.x), ri(c.y), c.carrier || 0, Math.round(c.boot * 100), c.atVan ? 1 : 0]),
     };
   }

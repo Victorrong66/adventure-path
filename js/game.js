@@ -289,7 +289,11 @@ export class Game {
     this.idleT -= dt;
     if (this.netT > 0 || !this.conn.open) return;
     const s = this.self;
-    const msg = { t: 'in', x: Math.round(s.x * 100) / 100, y: Math.round(s.y * 100) / 100, dir: s.dir, mv: s.mv, dash: s.dash, tpn: s.tpn };
+    const r = this.renderer;
+    const msg = {
+      t: 'in', x: Math.round(s.x * 100) / 100, y: Math.round(s.y * 100) / 100, dir: s.dir, mv: s.mv, dash: s.dash, tpn: s.tpn,
+      vw: Math.ceil(r.w / 2 / 16), vh: Math.ceil(r.h / 2 / 16), // how much we can see, so monsters spawn off-screen
+    };
     const key = JSON.stringify(msg);
     if (key === this.lastInput && this.idleT > 0) return;
     this.lastInput = key;
@@ -400,7 +404,10 @@ export class Game {
       case 'down': this.audio.sfx('down'); this.chatLine(null, e.m); break;
       case 'revive': if (mine) this.audio.sfx('revive'); break;
       case 'msg': this.chatLine(null, e.m); break;
-      case 'box': this.audio.sfx('coin'); this.chatLine(null, e.m); break;
+      case 'box':
+        if (e.ready) { if (mine) { this.audio.sfx('lvl'); this.chatLine(null, 'The Giant Sword is yours: grab it before it sinks back in!'); } }
+        else { this.audio.sfx('coin'); this.chatLine(null, e.m); }
+        break;
       case 'card': if (mine) this.audio.sfx('pick'); this.chatLine(null, e.m); break;
       case 'giant':
         this.audio.sfx('giant');
@@ -530,10 +537,13 @@ export class Game {
     return !!me && Math.hypot(me.x - b.x, me.y - b.y) < 2.2;
   }
 
+  // One button: spin the box, then take the prize once it shows.
   spinBox() {
     const st = this.myStats();
+    const bx = this.state.bx;
     if (!st || st.dead || !this.nearBox()) return;
-    if (this.state.bx) return this.chatLine(null, 'Someone is already spinning the Mystery Box!');
+    if (bx && bx[2] && bx[0] === this.myId) return this.act('box');
+    if (bx) return this.chatLine(null, 'Someone else is using the Mystery Box!');
     if (st.g < BOX_COST) return this.chatLine(null, `The Mystery Box costs ${BOX_COST} gold.`);
     this.act('box');
   }
@@ -651,9 +661,12 @@ export class Game {
     $('act-shop').classList.toggle('hidden', !this.nearMerchant());
     const boxBtn = $('act-box');
     boxBtn.classList.toggle('hidden', !this.nearBox() || st.dead);
-    const boxLabel = this.state.bx ? 'Spinning...' : `Mystery Box ${BOX_COST}g (F)`;
+    const bx = this.state.bx;
+    const take = !!(bx && bx[2] && bx[0] === this.myId);
+    const boxLabel = take ? 'Take Giant Sword! (F)' : bx ? (bx[0] === this.myId ? 'Spinning...' : 'Box in use') : `Spin Mystery Box ${BOX_COST}g (F)`;
     if (boxBtn.textContent !== boxLabel) boxBtn.textContent = boxLabel;
-    boxBtn.disabled = !!this.state.bx || st.g < BOX_COST;
+    boxBtn.disabled = !take && (!!bx || st.g < BOX_COST);
+    boxBtn.classList.toggle('take', take);
     if (this.shopOpen && (!this.nearMerchant() || st.dead)) this.toggleShop(false);
 
     const boss = view.enemies.find((e) => e.boss);
