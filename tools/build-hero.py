@@ -138,6 +138,7 @@ ANIM = {  # each labelled row: its box on the sheet, how many frames, how many t
     'atkF': ((780, 765, 1536, 874), 6, 6),  # downward slash, for attacking while facing the viewer
     'dash': ((0, 915, 775, 1010), 5, 5), 'dashL': ((780, 915, 1536, 1010), 5, 5),
 }
+BLACK_BG = set()  # sheets drawn on black (their outlines need drawing back on)
 def cut_sheet(path, anims, effects=True, bg_min=160):
     """Cut a labelled animation sheet (checkerboard background, dark label boxes) into
     run_frames[name] for each animation. effects: strip drawn slash arcs, speed lines
@@ -167,6 +168,12 @@ def cut_sheet(path, anims, effects=True, bg_min=160):
     checker = lambda q: not q[3] or (max(q[:3]) - min(q[:3]) <= 16 and sum(q[:3]) / 3 >= bg_min)
     edge = [(x, y) for x in range(AW) for y in (0, AH - 1)] + [(x, y) for y in range(AH) for x in (0, AW - 1)]
     for x, y in flood([q for q in edge if checker(ap[q])], checker): ap[x, y] = (0, 0, 0, 0)
+    # a black backdrop: flood away the near-black around the heroes (it takes their black
+    # outline with it; the outline is drawn back on after scaling)
+    black = lambda q: q[3] and max(q[:3]) <= 12
+    if sum(1 for q in edge if black(ap[q])) > len(edge) * 0.8:
+        for x, y in flood([q for q in edge if black(ap[q])], black): ap[x, y] = (0, 0, 0, 0)
+        BLACK_BG.add(path)
     if effects == 'arcs':
         # Just the slash arcs (light blue, never outlined), flooded through the light pixels
         # they're made of; the sword's blade is light too, but walled in by its dark outline.
@@ -306,9 +313,10 @@ k_run = 34 / (sum(f.height for f in run_frames['front']) / len(run_frames['front
 # scaled to the same size as the frames it replaces.
 import glob, os
 replaced = set()
+ROW_SRC = {}
 # the old dash frames crouched lower than the new ones: matching their height left the head
 # smaller than in every other animation (the up/down/left dashes follow this one)
-ROW_FIX = {'dash': 1.17, 'atk': 1.15}
+ROW_FIX = {'dash': 1.17, 'atk': 1.15, 'ninja:sideL': 0.88}
 # how to clean drawn effects off a row (see cut_sheet): these swings have a real sword
 ROW_EFFECTS = {'atk': 'arcs', 'atkL': 'arcs'}
 # (right-facing rows first, so the left-facing ones, and the up/down dashes, can match them)
@@ -318,6 +326,7 @@ for path in sorted(glob.glob('tools/hero-rows/*.png'), key=lambda p: (p.endswith
     old = run_frames.get(name)
     old_k = run_scale.get(name, k_run)
     W0, H0 = Image.open(path).size
+    ROW_SRC[name] = path
     cut_sheet(path, {name: ((0, 0, W0, H0), None, None)}, effects=ROW_EFFECTS.get(name, name.split(':')[-1].startswith(('atk', 'dash'))),
               bg_min=235)
     pair = {'sideL': 'side', 'idleL': 'idleR', 'atkL': 'atk', 'dashL': 'dash', 'dashF': 'dash', 'dashB': 'dash'}.get(name.split(':')[-1])
@@ -362,8 +371,21 @@ for name in BUILT + sorted(replaced - set(BUILT)):  # (plus new animations from 
                 role = classify(rr, gg, bb, x, y, sm.width, sm.height, name.split(':')[-1])
                 if name.startswith('bald:') and role == 'hair': role = 'skin'  # no hair to recolour
                 if name.startswith('baldninja:') and role == 'hair': role = 'skin'
-                if name.startswith(('ninja:', 'baldninja:')) and role != 'skin': role = 'keep'  # the ninja outfit keeps its colours
+                # the ninja outfit keeps its colours (but hair showing above a headband takes the
+                # player's hair colour)
+                ninja_hair = role == 'hair' and name in replaced and y < sm.height * 0.3
+                if name.startswith(('ninja:', 'baldninja:')) and role != 'skin' and not ninja_hair: role = 'keep'
                 px[x, y] = (rr, gg, bb, ROLE[role])
+        if ROW_SRC.get(name) in BLACK_BG:  # draw the dark outline back on
+            src = sm.copy(); sp = src.load()
+            sm = Image.new('RGBA', (sm.width + 2, sm.height + 2)); sm.paste(src, (1, 1)); px = sm.load()
+            for y in range(sm.height):
+                for x in range(sm.width):
+                    if px[x, y][3]: continue
+                    if any(0 <= x + dx - 1 < src.width and 0 <= y + dy - 1 < src.height and sp[x + dx - 1, y + dy - 1][3]
+                           for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                        px[x, y] = (24, 14, 16, 255)
+            sm = sm.crop(sm.getbbox())
         frames.append((name, sm))
 
 # pack into one strip, bottoms aligned; record each frame's foot anchor
