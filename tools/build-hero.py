@@ -134,9 +134,10 @@ ANIM = {  # each labelled row: its box on the sheet, how many frames, how many t
     'atkF': ((780, 765, 1536, 874), 6, 6),  # downward slash, for attacking while facing the viewer
     'dash': ((0, 915, 775, 1010), 5, 5), 'dashL': ((780, 915, 1536, 1010), 5, 5),
 }
-def cut_sheet(path, anims):
+def cut_sheet(path, anims, effects=True):
     """Cut a labelled animation sheet (checkerboard background, dark label boxes) into
-    run_frames[name] for each animation."""
+    run_frames[name] for each animation. effects: strip drawn slash arcs, speed lines
+    and dust (only needed for attacks and dashes; it can eat big highlights)."""
     anim = Image.open(path).convert('RGBA')
     ap = anim.load(); AW, AH = anim.size
     def flood(starts, pred):
@@ -155,36 +156,37 @@ def cut_sheet(path, anims):
             if (x, y) in done or not navy(ap[x, y]): continue
             c = flood([(x, y)], navy); done.update(c)
             xs = [q[0] for q in c]; ys = [q[1] for q in c]
-            if len(c) > 1500 and max(xs) - min(xs) > 100 and max(ys) - min(ys) < 40:
+            if len(c) > 1500 and max(xs) - min(xs) > 100 and max(ys) - min(ys) < max(40, AH * 0.1):
                 for yy in range(min(ys) - 3, max(ys) + 4):
                     for xx in range(min(xs) - 3, max(xs) + 4): ap[xx, yy] = (0, 0, 0, 0)
     checker = lambda q: not q[3] or (max(q[:3]) - min(q[:3]) <= 16 and sum(q[:3]) / 3 >= 160)
     edge = [(x, y) for x in range(AW) for y in (0, AH - 1)] + [(x, y) for y in range(AH) for x in (0, AW - 1)]
     for x, y in flood([q for q in edge if checker(ap[q])], checker): ap[x, y] = (0, 0, 0, 0)
-    # Drop the drawn slash arcs, speed lines and dust: the game draws its own slash, and
-    # they overlap neighbouring frames. Their blue edges go here (blades are only faintly
-    # blue); what's left of them no longer touches a hero and is skipped below.
-    # (but not sword blades: they're blue-white too, and always inside a dark outline)
-    dk = lambda q: q[3] and sum(q[:3]) < 150
-    near_dark = lambda x, y, R: any(dk(ap[x + dx, y + dy]) for dy in range(-R, R + 1) for dx in range(-R, R + 1)
-                                    if 0 <= x + dx < AW and 0 <= y + dy < AH)
-    blue = [(x, y) for y in range(AH) for x in range(AW)
-            if ap[x, y][3] and ap[x, y][2] - ap[x, y][0] > 38 and sum(ap[x, y][:3]) / 3 > 90]
-    for x, y in blue:
-        if not near_dark(x, y, 2): ap[x, y] = (0, 0, 0, 0)
-    # Their white cores: thick white areas (blade highlights are only thin lines), grown
-    # out through the white pixels around them.
-    white = lambda q: q[3] and min(q[:3]) >= 200 and max(q[:3]) - min(q[:3]) <= 30
-    seeds = [(x, y) for y in range(2, AH - 2) for x in range(2, AW - 2) if white(ap[x, y]) and
-             sum(1 for dy in range(-2, 3) for dx in range(-2, 3) if white(ap[x + dx, y + dy])) >= 18]
-    for x, y in flood(seeds, white): ap[x, y] = (0, 0, 0, 0)
-    # ...and the faint lines left at their edges: light pixels with no dark outline nearby
-    # (a blade is always within a few pixels of its outline).
-    light = lambda q: q[3] and sum(q[:3]) / 3 >= 140 and max(q[:3]) - min(q[:3]) <= 45
-    darkp = lambda q: q[3] and sum(q[:3]) < 150
-    kill = [(x, y) for y in range(4, AH - 4) for x in range(4, AW - 4) if light(ap[x, y]) and
-            not any(darkp(ap[x + dx, y + dy]) for dy in range(-4, 5) for dx in range(-4, 5))]
-    for q in kill: ap[q] = (0, 0, 0, 0)
+    if effects:
+        # Drop the drawn slash arcs, speed lines and dust: the game draws its own slash, and
+        # they overlap neighbouring frames. Their blue edges go here (blades are only faintly
+        # blue); what's left of them no longer touches a hero and is skipped below.
+        # (but not sword blades: they're blue-white too, and always inside a dark outline)
+        dk = lambda q: q[3] and sum(q[:3]) < 150
+        near_dark = lambda x, y, R: any(dk(ap[x + dx, y + dy]) for dy in range(-R, R + 1) for dx in range(-R, R + 1)
+                                        if 0 <= x + dx < AW and 0 <= y + dy < AH)
+        blue = [(x, y) for y in range(AH) for x in range(AW)
+                if ap[x, y][3] and ap[x, y][2] - ap[x, y][0] > 38 and sum(ap[x, y][:3]) / 3 > 90]
+        for x, y in blue:
+            if not near_dark(x, y, 2): ap[x, y] = (0, 0, 0, 0)
+        # Their white cores: thick white areas (blade highlights are only thin lines), grown
+        # out through the white pixels around them.
+        white = lambda q: q[3] and min(q[:3]) >= 200 and max(q[:3]) - min(q[:3]) <= 30
+        seeds = [(x, y) for y in range(2, AH - 2) for x in range(2, AW - 2) if white(ap[x, y]) and
+                 sum(1 for dy in range(-2, 3) for dx in range(-2, 3) if white(ap[x + dx, y + dy])) >= 18]
+        for x, y in flood(seeds, white): ap[x, y] = (0, 0, 0, 0)
+        # ...and the faint lines left at their edges: light pixels with no dark outline nearby
+        # (a blade is always within a few pixels of its outline).
+        light = lambda q: q[3] and sum(q[:3]) / 3 >= 140 and max(q[:3]) - min(q[:3]) <= 45
+        darkp = lambda q: q[3] and sum(q[:3]) < 150
+        kill = [(x, y) for y in range(4, AH - 4) for x in range(4, AW - 4) if light(ap[x, y]) and
+                not any(darkp(ap[x + dx, y + dy]) for dy in range(-4, 5) for dx in range(-4, 5))]
+        for q in kill: ap[q] = (0, 0, 0, 0)
 
     def body(q):
         """Hero pixels (hair, skin, cloak, clothes, outlines), as opposed to slash arcs and dust."""
@@ -223,6 +225,7 @@ def cut_sheet(path, anims):
                 else: runs.append((start, x))
                 start = None
         runs = [r for r in runs if sum(cols[r[0]:r[1]]) > 300]
+        if count is None: count = use = len(runs)  # a single-row sheet: as many frames as there are
         if len(runs) < count and runs:
             # frames joined by scarves or effects: they're evenly spaced, so split the row evenly
             lo, hi = runs[0][0], runs[-1][1]
@@ -277,7 +280,24 @@ cut_sheet('tools/hero-baldninja.png', anims)
 k = 34 / (sum(f.height for f in run_frames['baldninja:front']) / len(run_frames['baldninja:front']))
 for n in anims: run_scale[n] = k
 VARIANT_NAMES += list(anims)
+
 k_run = 34 / (sum(f.height for f in run_frames['front']) / len(run_frames['front']))
+
+# tools/hero-rows/<kind>.png (or bald-<kind>.png, ninja-<kind>.png, baldninja-<kind>.png):
+# one animation per image, a single labelled row of frames. It replaces that animation,
+# scaled to the same size as the frames it replaces.
+import glob, os
+for path in sorted(glob.glob('tools/hero-rows/*.png')):
+    stem = os.path.splitext(os.path.basename(path))[0]
+    name = stem.replace('-', ':', 1) if '-' in stem else stem
+    old = run_frames.get(name)
+    old_k = run_scale.get(name, k_run)
+    W0, H0 = Image.open(path).size
+    cut_sheet(path, {name: ((0, 0, W0, H0), None, None)}, effects=name.split(':')[-1].startswith(('atk', 'dash')))
+    if old:
+        target = sum(f.height for f in old) / len(old) * old_k
+        run_scale[name] = target / (sum(f.height for f in run_frames[name]) / len(run_frames[name]))
+    print('row', name, len(run_frames[name]), 'frames')
 
 # Bottom row: a 3-frame swing to the right (mirrored for the left), knocked dizzy,
 # lying knocked out, and the victory pose.
