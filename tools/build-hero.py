@@ -1,7 +1,7 @@
 """Builds the hero sprite atlas from tools/hero-sheet.png: cuts out the frames we use,
 shrinks them to game size and marks which pixels can be recoloured."""
 import sys, json, colorsys
-from PIL import Image
+from PIL import Image, ImageFilter
 # Usage: python3 tools/build-hero.py   (run from the repo root)
 def clear_checker(im):
     """Remove a checkerboard 'transparency' pattern drawn into the image."""
@@ -177,7 +177,48 @@ def cut_sheet(path, anims, effects=True, bg_min=160):
     if sum(1 for q in edge if black(ap[q])) > len(edge) * 0.8:
         for x, y in flood([q for q in edge if black(ap[q])], black): ap[x, y] = (0, 0, 0, 0)
         BLACK_BG.add(path)
-    if effects == 'arcs':
+    if effects in ('hstreaks', 'vstreaks'):
+        # Speed lines and dust drawn straight onto a black backdrop (no outline to stop at).
+        # (Each frame is also trimmed to the hero's own size afterwards: see trim_streaks.)
+        # The lines are thin across their direction (sideways streaks for a side dash, up-and-
+        # down ones for an up/down dash): keep only runs of pixels at least K long across them,
+        # plus whatever sits right next to those (fingers, scarf edges).
+        K = 9
+        keep = Image.new('L', anim.size); kp = keep.load()
+        if effects == 'hstreaks':
+            for x in range(AW):
+                y = 0
+                while y < AH:
+                    if not ap[x, y][3]: y += 1; continue
+                    y1 = y
+                    while y1 < AH and ap[x, y1][3]: y1 += 1
+                    if y1 - y >= K:
+                        for yy in range(y, y1): kp[x, yy] = 255
+                    y = y1
+        else:
+            for y in range(AH):
+                x = 0
+                while x < AW:
+                    if not ap[x, y][3]: x += 1; continue
+                    x1 = x
+                    while x1 < AW and ap[x1, y][3]: x1 += 1
+                    if x1 - x >= K:
+                        for xx in range(x, x1): kp[xx, y] = 255
+                    x = x1
+        near = keep.filter(ImageFilter.MaxFilter(7)).load()
+        for y in range(AH):
+            for x in range(AW):
+                if ap[x, y][3] and not near[x, y]: ap[x, y] = (0, 0, 0, 0)
+        # dust clouds: big warm-grey patches (the headband's metal plate is grey too, but small)
+        dust = lambda q: q[3] and sum(q[:3]) / 3 >= 70 and q[0] - q[2] <= 60 and max(q[:3]) - min(q[:3]) <= 70 and q[0] - q[1] <= 45
+        seen = set()
+        for y in range(AH):
+            for x in range(AW):
+                if (x, y) in seen or not dust(ap[x, y]): continue
+                c = flood([(x, y)], dust); seen.update(c)
+                if len(c) > 300:
+                    for q in c: ap[q] = (0, 0, 0, 0)
+    elif effects == 'arcs':
         # Just the slash arcs (light blue, never outlined), flooded through the light pixels
         # they're made of; the sword's blade is light too, but walled in by its dark outline.
         dk = lambda q: q[3] and sum(q[:3]) < 200
@@ -253,7 +294,10 @@ def cut_sheet(path, anims, effects=True, bg_min=160):
                 else: runs.append((start, x))
                 start = None
         runs = [r for r in runs if sum(cols[r[0]:r[1]]) > 300]
-        if count is None: count = use = len(runs)  # a single-row sheet: as many frames as there are
+        if count is None: count = use = ROW_COUNT.get(name, len(runs))  # a single-row sheet: as many frames as there are
+        while len(runs) > count:  # (a scarf or effect cut loose: join it to its nearest neighbour)
+            i = min(range(len(runs) - 1), key=lambda i: runs[i + 1][0] - runs[i][1])
+            runs[i:i + 2] = [(runs[i][0], runs[i + 1][1])]
         if len(runs) < count and runs:
             # frames joined by scarves or effects: they're evenly spaced, so split the row evenly
             lo, hi = runs[0][0], runs[-1][1]
@@ -317,11 +361,41 @@ k_run = 34 / (sum(f.height for f in run_frames['front']) / len(run_frames['front
 import glob, os
 replaced = set()
 ROW_SRC = {}
+
+def trim_streaks(name):
+    """A dash drawn with speed lines and dust: its first frame is clean, so every frame is cut
+    down to that size around the hero (in front for a side dash, the lines trail behind; around
+    the head for an up/down dash)."""
+    fr = run_frames[name]; W1, H1 = fr[0].size; kind = name.split(':')[-1]
+    out = []
+    for f in fr:
+        w, h = f.size; px = f.load()
+        if kind == 'dash': box = (max(0, w - round(W1 * 1.1)), 0, w, h)
+        elif kind == 'dashL': box = (0, 0, min(w, round(W1 * 1.1)), h)
+        else:
+            # the head: the topmost wide part (speed lines above it are thin)
+            top = next(y for y in range(h) if sum(1 for x in range(w) if px[x, y][3]) > W1 * 0.3)
+            xs = [x for y in range(top, min(h, top + H1 // 5)) for x in range(w) if px[x, y][3]]
+            cx = sum(xs) / len(xs)
+            box = (max(0, round(cx - W1 * 0.6)), top, min(w, round(cx + W1 * 0.6)), min(h, top + round(H1 * 1.05)))
+        f = f.crop(box)
+        # loose bits (the dust's dark rims, scraps of speed lines) stay as separate shapes: keep
+        # the hero (a side dash's scarf can come loose too, so only specks go there)
+        parts = components(f, 1)
+        big = max(len(c) for c, _, _ in parts)
+        g = Image.new('RGBA', f.size); gp = g.load(); fp = f.load()
+        for c, _, _ in parts:
+            if len(c) >= big * (0.25 if kind in ('dashB', 'dashF') else 0.03):
+                for q in c: gp[q] = fp[q]
+        f = g
+        out.append(f.crop(f.getbbox()))
+    run_frames[name] = out
 # the old dash frames crouched lower than the new ones: matching their height left the head
 # smaller than in every other animation (the up/down/left dashes follow this one)
 ROW_FIX = {'dash': 1.17, 'atk': 1.15}
 # how to clean drawn effects off a row (see cut_sheet): these swings have a real sword
-ROW_EFFECTS = {'atk': 'arcs', 'atkL': 'arcs'}
+ROW_COUNT = {'ninja:dash': 5, 'ninja:dashL': 5, 'ninja:dashB': 5, 'ninja:dashF': 5}  # frames, when a row's count can't be told
+ROW_EFFECTS = {'atk': 'arcs', 'atkL': 'arcs', 'ninja:dash': 'hstreaks', 'ninja:dashL': 'hstreaks', 'ninja:dashB': 'vstreaks', 'ninja:dashF': 'vstreaks'}
 # (right-facing rows first, so the left-facing ones, and the up/down dashes, can match them;
 # and the plain hero's before bald / ninja ones, which are sized to match it)
 def row_order(p):
@@ -348,6 +422,7 @@ for path in sorted(glob.glob('tools/hero-rows/*.png'), key=row_order):
     elif old:
         target = sum(f.height for f in old) / len(old) * old_k
         run_scale[name] = target / (sum(f.height for f in run_frames[name]) / len(run_frames[name])) * ROW_FIX.get(name, 1)
+    if ROW_EFFECTS.get(name) in ('hstreaks', 'vstreaks'): trim_streaks(name)
     replaced.add(name)
     print('row', name, len(run_frames[name]), 'frames')
 
