@@ -138,7 +138,7 @@ ANIM = {  # each labelled row: its box on the sheet, how many frames, how many t
     'atkF': ((780, 765, 1536, 874), 6, 6),  # downward slash, for attacking while facing the viewer
     'dash': ((0, 915, 775, 1010), 5, 5), 'dashL': ((780, 915, 1536, 1010), 5, 5),
 }
-def cut_sheet(path, anims, effects=True):
+def cut_sheet(path, anims, effects=True, bg_min=160):
     """Cut a labelled animation sheet (checkerboard background, dark label boxes) into
     run_frames[name] for each animation. effects: strip drawn slash arcs, speed lines
     and dust (only needed for attacks and dashes; it can eat big highlights)."""
@@ -163,10 +163,22 @@ def cut_sheet(path, anims, effects=True):
             if len(c) > 1500 and max(xs) - min(xs) > 100 and max(xs) - min(xs) > 2.5 * (max(ys) - min(ys)):
                 for yy in range(min(ys) - 3, max(ys) + 4):
                     for xx in range(min(xs) - 3, max(xs) + 4): ap[xx, yy] = (0, 0, 0, 0)
-    checker = lambda q: not q[3] or (max(q[:3]) - min(q[:3]) <= 16 and sum(q[:3]) / 3 >= 160)
+    # (bg_min: how light the backdrop is; plain white sheets use a high one, so grey blades stay)
+    checker = lambda q: not q[3] or (max(q[:3]) - min(q[:3]) <= 16 and sum(q[:3]) / 3 >= bg_min)
     edge = [(x, y) for x in range(AW) for y in (0, AH - 1)] + [(x, y) for y in range(AH) for x in (0, AW - 1)]
     for x, y in flood([q for q in edge if checker(ap[q])], checker): ap[x, y] = (0, 0, 0, 0)
-    if effects:
+    if effects == 'arcs':
+        # Just the slash arcs (light blue, never outlined), flooded through the light pixels
+        # they're made of; the sword's blade is light too, but walled in by its dark outline.
+        dk = lambda q: q[3] and sum(q[:3]) < 200
+        far = lambda x, y, R: not any(dk(ap[x + dx, y + dy]) for dy in range(-R, R + 1) for dx in range(-R, R + 1)
+                                      if 0 <= x + dx < AW and 0 <= y + dy < AH)
+        seeds = [(x, y) for y in range(AH) for x in range(AW)
+                 if ap[x, y][3] and ap[x, y][2] - ap[x, y][0] > 60 and sum(ap[x, y][:3]) / 3 > 120 and far(x, y, 4)]
+        # (through blue or near-white pixels only: the blade is a grey with just a hint of blue)
+        arc = lambda q: q[3] and not dk(q) and sum(q[:3]) / 3 >= 120 and (q[2] - q[0] > 25 or min(q[:3]) >= 238)
+        for x, y in flood(seeds, arc): ap[x, y] = (0, 0, 0, 0)
+    elif effects:
         # Drop the drawn slash arcs, speed lines and dust: the game draws its own slash, and
         # they overlap neighbouring frames. Their blue edges go here (blades are only faintly
         # blue); what's left of them no longer touches a hero and is skipped below.
@@ -296,7 +308,9 @@ import glob, os
 replaced = set()
 # the old dash frames crouched lower than the new ones: matching their height left the head
 # smaller than in every other animation (the up/down/left dashes follow this one)
-ROW_FIX = {'dash': 1.17}
+ROW_FIX = {'dash': 1.17, 'atk': 1.15}
+# how to clean drawn effects off a row (see cut_sheet): these swings have a real sword
+ROW_EFFECTS = {'atk': 'arcs', 'atkL': 'arcs'}
 # (right-facing rows first, so the left-facing ones, and the up/down dashes, can match them)
 for path in sorted(glob.glob('tools/hero-rows/*.png'), key=lambda p: (p.endswith(('L.png', 'F.png', 'B.png')) and 'dash' in p or p.endswith('L.png'), p)):
     stem = os.path.splitext(os.path.basename(path))[0]
@@ -304,7 +318,8 @@ for path in sorted(glob.glob('tools/hero-rows/*.png'), key=lambda p: (p.endswith
     old = run_frames.get(name)
     old_k = run_scale.get(name, k_run)
     W0, H0 = Image.open(path).size
-    cut_sheet(path, {name: ((0, 0, W0, H0), None, None)}, effects=name.split(':')[-1].startswith(('atk', 'dash')))
+    cut_sheet(path, {name: ((0, 0, W0, H0), None, None)}, effects=ROW_EFFECTS.get(name, name.split(':')[-1].startswith(('atk', 'dash'))),
+              bg_min=235)
     pair = {'sideL': 'side', 'idleL': 'idleR', 'atkL': 'atk', 'dashL': 'dash', 'dashF': 'dash', 'dashB': 'dash'}.get(name.split(':')[-1])
     pair = pair and name.replace(name.split(':')[-1], pair)
     if pair in replaced:  # a left-facing row: the same size as its right-facing one
