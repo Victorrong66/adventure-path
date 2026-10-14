@@ -65,7 +65,8 @@ export class Renderer {
 
   event(e, players) {
     switch (e.k) {
-      case 'dmg': this.addFx({ t: 'num', x: e.x, y: e.y, v: e.v, life: 0.7, z: 0 }); break;
+      case 'dmg': this.addFx({ t: 'num', x: e.x, y: e.y, v: e.v, life: 0.7, z: 0, c: e.c }); break;
+      case 'nova': this.addFx({ t: 'nova', x: e.x, y: e.y, r: e.r, life: 0.35 }); break;
       case 'die':
         if (animFrames(e.t, 'die')) this.addFx({ t: 'corpse', type: e.t, d: e.d || 1, x: e.x, y: e.y, life: e.t === 'ogre' ? 3 : 1.6, max: e.t === 'ogre' ? 3 : 1.6 });
         for (let i = 0; i < 6; i++) this.addFx({ t: 'part', x: e.x, y: e.y, vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3, z: 6, vz: 20 + Math.random() * 20, life: 0.5, c: { slime: '#3cb83c', imp: '#d83c2c', shroomling: '#e84838', golem: '#8c8068', bat: '#7c3c6c', goblin: '#7c8c3c' }[e.t] || '#e8e8d8' });
@@ -195,6 +196,18 @@ export class Renderer {
             g.translate(this.sx(it.e.x, it.e.y), this.sy(it.e.x, it.e.y) - 6);
             g.rotate(Math.atan2(it.e.vy, it.e.vx) + Math.PI);
             g.drawImage(f.img, -f.w * 0.3, -f.h / 2, f.w, f.h);
+            g.restore();
+            break;
+          }
+          if (it.e.kind === 'knife') {
+            // a throwing knife: steel blade, dark hilt, pointing where it flies
+            g.save();
+            g.translate(this.sx(it.e.x, it.e.y), this.sy(it.e.x, it.e.y) - 6);
+            g.rotate(Math.atan2(it.e.vy, it.e.vx));
+            g.fillStyle = '#3a2a24'; g.fillRect(-6, -1, 4, 3);
+            g.fillStyle = '#c8a040'; g.fillRect(-2, -2, 1, 5);
+            g.fillStyle = '#e8eef8'; g.fillRect(-1, -1, 7, 2);
+            g.fillStyle = '#a8b0c0'; g.fillRect(-1, 1, 6, 1);
             g.restore();
             break;
           }
@@ -567,11 +580,24 @@ export class Renderer {
         f.z += dt * 18;
         const x = this.sx(f.x, f.y), y = this.sy(f.x, f.y) - 14 - Math.round(f.z);
         const s = String(f.v);
-        drawText(g, s, x - (textWidth(s) >> 1), y, f.v >= 40 ? '#f8d838' : '#ffffff');
+        drawText(g, f.c ? s + '!' : s, x - (textWidth(s) >> 1), y, f.c ? '#f87838' : f.v >= 40 ? '#f8d838' : '#ffffff'); // (a lucky double-damage hit)
       } else if (f.t === 'part') {
         f.x += f.vx * dt; f.y += f.vy * dt; f.vz -= 80 * dt; f.z = Math.max(0, f.z + f.vz * dt);
         g.fillStyle = f.c;
         g.fillRect(this.sx(f.x, f.y), this.sy(f.x, f.y) - Math.round(f.z), 2, 2);
+      } else if (f.t === 'nova') {
+        // Fire Nova: a ring of fire racing out to its full reach
+        const prog = 1 - f.life / 0.35, R = f.r * (0.3 + 0.7 * prog);
+        const n = 40;
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * Math.PI * 2;
+          const px = this.sx(f.x + Math.cos(a) * R, f.y + Math.sin(a) * R);
+          const py = this.sy(f.x + Math.cos(a) * R, f.y + Math.sin(a) * R) - 4;
+          g.fillStyle = i % 3 ? '#f87828' : '#f8d838';
+          g.globalAlpha = 1 - prog * 0.7;
+          g.fillRect(px - 1, py - 1, 3, 3);
+        }
+        g.globalAlpha = 1;
       } else if (f.t === 'zap') {
         const x = this.sx(f.x, f.y), y = this.sy(f.x, f.y);
         g.fillStyle = Math.random() < 0.5 ? '#ffffff' : '#f8f878';

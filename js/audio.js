@@ -99,6 +99,7 @@ export class Audio8 {
       case 'heal': [C5, E5, G5].forEach((n, i) => this.tone(NOTE(n), 0.1, 'triangle', 0.15, 0, i * 0.06)); break;
       case 'hurt': this.tone(180, 0.18, 'sawtooth', 0.15, -100); break;
       case 'zap': this.noise(0.18, 0.18); this.tone(2000, 0.12, 'square', 0.05, -1800); break;
+      case 'nova': this.noise(0.22, 0.14); this.tone(180, 0.2, 'sawtooth', 0.05, -120); break;
       case 'lvl': [C4, E4, G4, C5, E5].forEach((n, i) => this.tone(NOTE(n), 0.12, 'square', 0.12, 0, i * 0.07)); break;
       case 'pick': this.tone(NOTE(G5), 0.1, 'square', 0.1); this.tone(NOTE(C5 + 12), 0.15, 'square', 0.1, 0, 0.08); break;
       case 'wave': [A3, C4, E4, A4].forEach((n, i) => this.tone(NOTE(n), 0.16, 'square', 0.14, 0, i * 0.12)); break;

@@ -150,7 +150,7 @@ function demoFrame(dt) {
   const tc = $('title-hero').getContext('2d');
   tc.clearRect(0, 0, 28, 34);
   const ts = charSprite(profile.look, 0, 0, 'idle');
-  tc.drawImage(ts.img, 14 - ts.ox, 33 - ts.oy - (Math.floor(demoT * 2) % 2));
+  tc.drawImage(ts.img, 14 - ts.ox, 33 - ts.oy - (Math.floor(demoT * 2) % 2), ts.w, ts.h);
 }
 let lastT = performance.now();
 (function menuLoop(now) {
@@ -228,7 +228,7 @@ $('char-done').addEventListener('click', () => {
     const s = t < 1800 ? charSprite(draft.look, DIRS[previewDir], Math.floor(t / RUN_FRAME_MS))
       : t < 3000 ? charSprite(draft.look, DIRS[previewDir], Math.floor(t / 140), 'idle')
         : charSprite(draft.look, DIRS[previewDir], (t - 3000) / 600, 'atk');
-    g.drawImage(s.img, 120 - s.ox * 5, 190 - s.oy * 5, s.img.width * 5, s.img.height * 5);
+    g.drawImage(s.img, 120 - s.ox * 5, 190 - s.oy * 5, s.w * 5, s.h * 5); // (w/h: the Classic Ninja is drawn scaled up)
   }
   requestAnimationFrame(previewLoop);
 })();

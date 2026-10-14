@@ -403,6 +403,7 @@ export class Game {
       case 'dmg': this.audio.sfx('hit'); break;
       case 'die': this.audio.sfx('die'); break;
       case 'zap': this.audio.sfx('zap'); break;
+      case 'nova': this.audio.sfx('nova'); break;
       case 'slash': if (!mine) this.audio.sfx('slash'); break;
       case 'hurt': if (mine) this.audio.sfx('hurt'); break;
       case 'lvl': if (mine) { this.audio.sfx('lvl'); } break;

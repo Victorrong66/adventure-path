@@ -9,6 +9,8 @@ export const WEAPONS = {
   blades: { name: 'Orbit Blades', desc: 'Blades spin around you' },
   aura: { name: 'Holy Aura', desc: 'Burns monsters close to you' },
   zap: { name: 'Lightning', desc: 'Strikes random monsters' },
+  knives: { name: 'Throwing Knives', desc: 'Throws knives the way you face' },
+  nova: { name: 'Fire Nova', desc: 'Bursts of fire blast monsters away' },
 };
 export const PASSIVES = {
   might: { name: 'Might', desc: '+15% damage' },
@@ -16,6 +18,15 @@ export const PASSIVES = {
   swift: { name: 'Swift Feet', desc: '+10% move speed' },
   magnet: { name: 'Magnet', desc: '+1 pickup range' },
   regen: { name: 'Regen', desc: '+0.6 HP per second' },
+  armor: { name: 'Armor', desc: '-7% damage taken' },
+  crit: { name: 'Lucky Strike', desc: '+8% chance to hit twice as hard' },
+  haste: { name: 'Quick Hands', desc: 'Weapons and slashes 7% faster' },
+  greed: { name: 'Greed', desc: '+20% gold' },
+  wisdom: { name: 'Wisdom', desc: '+15% XP' },
+  // Once everything above is maxed out, level-ups keep offering these (no limit).
+  surge: { name: 'Power Surge', desc: '+6% damage', rep: true },
+  tough: { name: 'Toughness', desc: '+12 max HP', rep: true },
+  stride: { name: 'Stride', desc: '+3% move speed', rep: true },
 };
 export const SHOP = [
   { id: 'power', name: 'Power Crystal', desc: '+5% damage, forever', base: 30, step: 25, max: 10 },
@@ -42,7 +53,7 @@ const ENEMY = {
   ogre: { hp: 450, spd: 1.25, dmg: 25, r: 0.8, xp: 40, boss: true },
 };
 export const ENEMY_TYPES = Object.keys(ENEMY);
-export const PROJ_KINDS = ['bolt', 'fire', 'plasma', 'slime', 'spore', 'batbolt', 'rock', 'wisp'];
+export const PROJ_KINDS = ['bolt', 'fire', 'plasma', 'slime', 'spore', 'batbolt', 'rock', 'wisp', 'knife'];
 // Monster attacks: melee monsters (goblin, skeleton) stop and swing, landing the hit
 // MELEE_HIT seconds in if you're still in reach; shooters pause to fire their
 // projectile, which leaves SHOOT_FIRE seconds into the SHOOT_TIME-long attack.
@@ -231,11 +242,16 @@ export class Sim {
   recalc(p) {
     const ps = p.passives, pm = p.perm;
     const oldMax = p.maxHp;
-    p.maxHp = 100 + 20 * (ps.vital || 0) + 10 * (pm.heart || 0);
+    p.maxHp = 100 + 20 * (ps.vital || 0) + 12 * (ps.tough || 0) + 10 * (pm.heart || 0);
     if (p.maxHp > oldMax) p.hp += p.maxHp - oldMax;
     p.hp = Math.min(p.hp, p.maxHp);
-    p.spd = BASE_SPEED * (1 + 0.1 * (ps.swift || 0) + 0.04 * (pm.boots || 0));
-    p.dmgMul = (1 + 0.15 * (ps.might || 0)) * (1 + 0.05 * (pm.power || 0));
+    p.spd = BASE_SPEED * (1 + 0.1 * (ps.swift || 0) + 0.03 * (ps.stride || 0) + 0.04 * (pm.boots || 0));
+    p.dmgMul = (1 + 0.15 * (ps.might || 0)) * (1 + 0.06 * (ps.surge || 0)) * (1 + 0.05 * (pm.power || 0));
+    p.armor = 1 - 0.07 * (ps.armor || 0);       // damage taken
+    p.crit = 0.08 * (ps.crit || 0);             // chance of a double-damage hit
+    p.cdMul = 1 - 0.07 * (ps.haste || 0);       // weapon and slash cooldowns
+    p.goldMul = 1 + 0.2 * (ps.greed || 0);
+    p.xpMul = 1 + 0.15 * (ps.wisdom || 0);
     p.magnet = 1.4 + (ps.magnet || 0);
     p.regen = 0.6 * (ps.regen || 0);
   }
@@ -397,7 +413,7 @@ export class Sim {
     if (!l) return;
     dx /= l; dy /= l;
     const L = p.weapons.sword || 1;
-    p.slashAt = this.t + slashCooldown(L) - 0.05;
+    p.slashAt = this.t + slashCooldown(L) * (p.cdMul || 1) - 0.05;
     // Mystery Box weapons change the slash: reach, damage, how wide it sweeps, knockback
     const pw = p.pw;
     const reach = { sword: 0.8, axe: 0.5, scythe: 0.7 }[pw] || 0;
@@ -421,14 +437,16 @@ export class Sim {
   rollChoices(p) {
     const opts = [];
     for (const k of Object.keys(WEAPONS)) if ((p.weapons[k] || 0) < MAX_LEVEL) opts.push({ k, t: 'w' });
-    for (const k of Object.keys(PASSIVES)) if ((p.passives[k] || 0) < MAX_LEVEL) opts.push({ k, t: 'p' });
+    for (const k of Object.keys(PASSIVES)) if (!PASSIVES[k].rep && (p.passives[k] || 0) < MAX_LEVEL) opts.push({ k, t: 'p' });
     shuffle(opts);
+    // nearly everything maxed out: top up with the upgrades that never run out
+    const more = shuffle(Object.keys(PASSIVES).filter((k) => PASSIVES[k].rep));
+    while (opts.length < 3 && more.length) opts.push({ k: more.pop(), t: 'p' });
     p.choices = opts.slice(0, 3).map((o) => {
       const def = o.t === 'w' ? WEAPONS[o.k] : PASSIVES[o.k];
       const lvl = (o.t === 'w' ? p.weapons[o.k] || 0 : p.passives[o.k] || 0) + 1;
       return { k: o.k, t: o.t, name: def.name, desc: lvl === 1 && o.t === 'w' ? 'NEW! ' + def.desc : def.desc, lvl };
     });
-    if (!p.choices.length) p.choices = [{ k: 'gold', t: 'g', name: 'Gold Pouch', desc: '+25 gold', lvl: 0 }];
   }
 
   pick(p, i) {
@@ -501,7 +519,7 @@ export class Sim {
 
   gainXp(v) {
     for (const p of this.party()) {
-      p.xp += v;
+      p.xp += v * (p.xpMul || 1);
       while (p.xp >= p.xpNext) {
         p.xp -= p.xpNext;
         p.level++;
@@ -521,7 +539,7 @@ export class Sim {
 
   hurtPlayer(p, dmg) {
     if (p.dead || p.inv > 0 || p.dash || p.god) return;
-    p.hp -= dmg;
+    p.hp -= dmg * (p.armor || 1);
     p.inv = 0.5;
     this.emit({ k: 'hurt', id: p.id });
     if (p.hp <= 0) {
@@ -660,10 +678,12 @@ export class Sim {
 
   hitEnemy(e, dmg, by) {
     if (e.dead) return;
+    const crit = by && by.crit && Math.random() < by.crit;
+    if (crit) dmg *= 2;
     dmg = Math.max(1, Math.round(dmg));
     e.hp -= dmg;
     e.flash = 0.12;
-    this.emit({ k: 'dmg', x: r2(e.x), y: r2(e.y), v: dmg });
+    this.emit({ k: 'dmg', x: r2(e.x), y: r2(e.y), v: dmg, c: crit ? 1 : undefined });
     if (e.hp <= 0) {
       this.killEnemy(e);
       if (by && by.pw === 'scythe' && !by.dead) by.hp = Math.min(by.maxHp, by.hp + 4); // the Reaper Scythe heals on kills
@@ -803,10 +823,10 @@ export class Sim {
               const a = base + (i - (count - 1) / 2) * 0.2;
               this.projs.push({
                 id: this.nid++, kind: 'bolt', x: p.x, y: p.y, vx: Math.cos(a) * 10, vy: Math.sin(a) * 10,
-                dmg: (9 + 4 * (L - 1)) * p.dmgMul, pierce: 1 + (L >= 4 ? 1 : 0), life: 1.1, hit: new Set(),
+                dmg: (9 + 4 * (L - 1)) * p.dmgMul, pierce: 1 + (L >= 4 ? 1 : 0), life: 1.1, hit: new Set(), by: p,
               });
             }
-            cd.bolt = Math.max(0.25, 0.85 - 0.1 * (L - 1));
+            cd.bolt = Math.max(0.25, 0.85 - 0.1 * (L - 1)) * p.cdMul;
             this.emit({ k: 'sfx', s: 'shoot', id: p.id });
           } else cd.bolt = 0.1;
         }
@@ -818,7 +838,7 @@ export class Sim {
           for (const e of this.enemies) {
             if (e.dead || e.bladeT > this.t) continue;
             if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 < (0.35 + e.r) ** 2) {
-              this.hitEnemy(e, dmg);
+              this.hitEnemy(e, dmg, p);
               e.bladeT = this.t + 0.35;
             }
           }
@@ -828,10 +848,10 @@ export class Sim {
       if (w.aura) {
         cd.aura = (cd.aura || 0) - dt;
         if (cd.aura <= 0) {
-          cd.aura = 0.5;
+          cd.aura = 0.5 * p.cdMul;
           const R = auraRadius(w.aura);
           for (const e of this.enemies) {
-            if (!e.dead && (e.x - p.x) ** 2 + (e.y - p.y) ** 2 < (R + e.r) ** 2) this.hitEnemy(e, (3 + 2 * w.aura) * p.dmgMul);
+            if (!e.dead && (e.x - p.x) ** 2 + (e.y - p.y) ** 2 < (R + e.r) ** 2) this.hitEnemy(e, (3 + 2 * w.aura) * p.dmgMul, p);
           }
         }
       }
@@ -839,13 +859,50 @@ export class Sim {
       if (w.zap) {
         cd.zap = (cd.zap || 0) - dt;
         if (cd.zap <= 0) {
-          cd.zap = 2.6 - 0.3 * w.zap;
+          cd.zap = (2.6 - 0.3 * w.zap) * p.cdMul;
           const strikes = 1 + (w.zap >= 3 ? 1 : 0) + (w.zap >= 5 ? 1 : 0);
           const near = this.enemies.filter((e) => !e.dead && (e.x - p.x) ** 2 + (e.y - p.y) ** 2 < 49);
           shuffle(near);
           for (const e of near.slice(0, strikes)) {
             this.emit({ k: 'zap', x: r2(e.x), y: r2(e.y) });
-            this.hitEnemy(e, (14 + 8 * w.zap) * p.dmgMul);
+            this.hitEnemy(e, (14 + 8 * w.zap) * p.dmgMul, p);
+          }
+        }
+      }
+      // Throwing knives: a fan of knives the way you're facing
+      if (w.knives) {
+        cd.knives = (cd.knives || 0) - dt;
+        if (cd.knives <= 0) {
+          const L = w.knives;
+          cd.knives = (1.1 - 0.08 * L) * p.cdMul;
+          const base = [Math.PI / 2, -Math.PI / 2, 0, Math.PI][p.dir] ?? 0;
+          const count = 1 + Math.floor(L / 2);
+          for (let i = 0; i < count; i++) {
+            const a = base + (i - (count - 1) / 2) * 0.22;
+            this.projs.push({
+              id: this.nid++, kind: 'knife', x: p.x, y: p.y, vx: Math.cos(a) * 12, vy: Math.sin(a) * 12,
+              dmg: (8 + 4 * L) * p.dmgMul, pierce: L >= 4 ? 2 : 1, life: 0.7, hit: new Set(), by: p,
+            });
+          }
+        }
+      }
+      // Fire nova: a burst of fire around you that throws monsters back
+      if (w.nova) {
+        cd.nova = (cd.nova ?? 1.5) - dt;
+        if (cd.nova <= 0) {
+          const L = w.nova;
+          cd.nova = (3.8 - 0.3 * L) * p.cdMul;
+          const R = 1.8 + 0.35 * L;
+          this.emit({ k: 'nova', x: r2(p.x), y: r2(p.y), r: r2(R) });
+          for (const e of this.enemies) {
+            if (e.dead) continue;
+            const rx = e.x - p.x, ry = e.y - p.y, d = Math.hypot(rx, ry);
+            if (d > R + e.r) continue;
+            this.hitEnemy(e, (12 + 7 * L) * p.dmgMul, p);
+            if (!e.boss && !e.dead && d > 0.01) {
+              const push = 0.8 / d;
+              if (ENEMY[e.type].fly) { e.x += rx * push; e.y += ry * push; } else this.world.move(e, rx * push, ry * push, e.r * 0.7);
+            }
           }
         }
       }
@@ -1053,7 +1110,7 @@ export class Sim {
       if (d < 0.45) {
         k.taken = true; changed = true;
         if (k.kind.startsWith('xp')) { this.gainXp(k.v); this.emit({ k: 'sfx', s: 'xp', id: best.id }); }
-        else if (k.kind === 'coin') { best.gold += k.v; this.emit({ k: 'sfx', s: 'coin', id: best.id }); }
+        else if (k.kind === 'coin') { best.gold += Math.round(k.v * (best.goldMul || 1)); this.emit({ k: 'sfx', s: 'coin', id: best.id }); }
         else if (k.kind === 'gsword') {
           best.giantT = Math.min(GIANT_TIME * 2, (best.giantT || 0) + k.v);
           this.emit({ k: 'giant', id: best.id, m: `${best.name} grabbed the GIANT SWORD!` });
