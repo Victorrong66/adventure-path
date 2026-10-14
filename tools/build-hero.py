@@ -145,6 +145,9 @@ def cut_sheet(path, anims, effects=True, bg_min=160):
     and dust (only needed for attacks and dashes; it can eat big highlights)."""
     anim = Image.open(path).convert('RGBA')
     ap = anim.load(); AW, AH = anim.size
+    for y in range(AH):  # (some sheets carry nearly invisible pixels: they're empty)
+        for x in range(AW):
+            if 0 < ap[x, y][3] < 128: ap[x, y] = (0, 0, 0, 0)
     def flood(starts, pred):
         seen = set(starts); st = list(starts); out = []
         while st:
@@ -316,11 +319,15 @@ replaced = set()
 ROW_SRC = {}
 # the old dash frames crouched lower than the new ones: matching their height left the head
 # smaller than in every other animation (the up/down/left dashes follow this one)
-ROW_FIX = {'dash': 1.17, 'atk': 1.15, 'ninja:sideL': 0.88}
+ROW_FIX = {'dash': 1.17, 'atk': 1.15}
 # how to clean drawn effects off a row (see cut_sheet): these swings have a real sword
 ROW_EFFECTS = {'atk': 'arcs', 'atkL': 'arcs'}
-# (right-facing rows first, so the left-facing ones, and the up/down dashes, can match them)
-for path in sorted(glob.glob('tools/hero-rows/*.png'), key=lambda p: (p.endswith(('L.png', 'F.png', 'B.png')) and 'dash' in p or p.endswith('L.png'), p)):
+# (right-facing rows first, so the left-facing ones, and the up/down dashes, can match them;
+# and the plain hero's before bald / ninja ones, which are sized to match it)
+def row_order(p):
+    stem = os.path.basename(p)
+    return (stem.endswith(('L.png', 'F.png', 'B.png')) and 'dash' in stem or stem.endswith('L.png'), '-' in stem, p)
+for path in sorted(glob.glob('tools/hero-rows/*.png'), key=row_order):
     stem = os.path.splitext(os.path.basename(path))[0]
     name = stem.replace('-', ':', 1) if '-' in stem else stem
     old = run_frames.get(name)
@@ -331,7 +338,12 @@ for path in sorted(glob.glob('tools/hero-rows/*.png'), key=lambda p: (p.endswith
               bg_min=235)
     pair = {'sideL': 'side', 'idleL': 'idleR', 'atkL': 'atk', 'dashL': 'dash', 'dashF': 'dash', 'dashB': 'dash'}.get(name.split(':')[-1])
     pair = pair and name.replace(name.split(':')[-1], pair)
-    if pair in replaced:  # a left-facing row: the same size as its right-facing one
+    plain = name.split(':')[-1]
+    avg_h = lambda n: sum(f.height for f in run_frames[n]) / len(run_frames[n])
+    if ':' in name and plain in replaced:  # a bald / ninja row: the plain hero's size
+        target = avg_h(plain) * run_scale[plain] - (2 if path in BLACK_BG else 0)  # (outline drawn on later)
+        run_scale[name] = target / avg_h(name)
+    elif pair in replaced:  # a left-facing row: the same size as its right-facing one
         run_scale[name] = run_scale[pair]
     elif old:
         target = sum(f.height for f in old) / len(old) * old_k
