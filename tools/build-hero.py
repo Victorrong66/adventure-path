@@ -160,7 +160,7 @@ def cut_sheet(path, anims, effects=True):
             if (x, y) in done or not navy(ap[x, y]): continue
             c = flood([(x, y)], navy); done.update(c)
             xs = [q[0] for q in c]; ys = [q[1] for q in c]
-            if len(c) > 1500 and max(xs) - min(xs) > 100 and max(ys) - min(ys) < max(40, AH * 0.1):
+            if len(c) > 1500 and max(xs) - min(xs) > 100 and max(xs) - min(xs) > 2.5 * (max(ys) - min(ys)):
                 for yy in range(min(ys) - 3, max(ys) + 4):
                     for xx in range(min(xs) - 3, max(xs) + 4): ap[xx, yy] = (0, 0, 0, 0)
     checker = lambda q: not q[3] or (max(q[:3]) - min(q[:3]) <= 16 and sum(q[:3]) / 3 >= 160)
@@ -293,16 +293,23 @@ k_run = 34 / (sum(f.height for f in run_frames['front']) / len(run_frames['front
 # one animation per image, a single labelled row of frames. It replaces that animation,
 # scaled to the same size as the frames it replaces.
 import glob, os
-for path in sorted(glob.glob('tools/hero-rows/*.png')):
+replaced = set()
+# (right-facing rows first, so the left-facing ones can match them)
+for path in sorted(glob.glob('tools/hero-rows/*.png'), key=lambda p: p.endswith('L.png')):
     stem = os.path.splitext(os.path.basename(path))[0]
     name = stem.replace('-', ':', 1) if '-' in stem else stem
     old = run_frames.get(name)
     old_k = run_scale.get(name, k_run)
     W0, H0 = Image.open(path).size
     cut_sheet(path, {name: ((0, 0, W0, H0), None, None)}, effects=name.split(':')[-1].startswith(('atk', 'dash')))
-    if old:
+    pair = {'sideL': 'side', 'idleL': 'idleR', 'atkL': 'atk', 'dashL': 'dash'}.get(name.split(':')[-1])
+    pair = pair and name.replace(name.split(':')[-1], pair)
+    if pair in replaced:  # a left-facing row: the same size as its right-facing one
+        run_scale[name] = run_scale[pair]
+    elif old:
         target = sum(f.height for f in old) / len(old) * old_k
         run_scale[name] = target / (sum(f.height for f in run_frames[name]) / len(run_frames[name]))
+    replaced.add(name)
     print('row', name, len(run_frames[name]), 'frames')
 
 # Bottom row: a 3-frame swing to the right (mirrored for the left), knocked dizzy,
