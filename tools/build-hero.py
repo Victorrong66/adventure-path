@@ -218,6 +218,23 @@ def cut_sheet(path, anims, effects=True, bg_min=160):
                 c = flood([(x, y)], dust); seen.update(c)
                 if len(c) > 300:
                     for q in c: ap[q] = (0, 0, 0, 0)
+    elif effects == 'redarcs':
+        # Glowing red slash arcs on a black backdrop: their bright pink-white body comes off as
+        # big shapes (the headband's small metal plate is light too), then the dim red glow
+        # right around where they were.
+        bright = lambda q: q[3] and q[0] >= 170 and (q[1] >= 60 and q[2] >= 70 and abs(q[1] - q[2]) < 60 or q[1] < 90 and q[2] < 110)  # (pink-white core, red rim)
+        gone = Image.new('L', anim.size); gp = gone.load(); seen = set()
+        for y in range(AH):
+            for x in range(AW):
+                if (x, y) in seen or not bright(ap[x, y]): continue
+                c = flood([(x, y)], bright); seen.update(c)
+                if len(c) > 1500:
+                    for q in c: ap[q] = (0, 0, 0, 0); gp[q] = 255
+        near = gone.filter(ImageFilter.MaxFilter(15)).filter(ImageFilter.MaxFilter(15)).filter(ImageFilter.MaxFilter(15)).load()
+        for y in range(AH):
+            for x in range(AW):
+                q = ap[x, y]
+                if q[3] and near[x, y] and max(q[1], q[2]) < 45 and q[0] < 170: ap[x, y] = (0, 0, 0, 0)
     elif effects == 'arcs':
         # Just the slash arcs (light blue, never outlined), flooded through the light pixels
         # they're made of; the sword's blade is light too, but walled in by its dark outline.
@@ -362,6 +379,32 @@ import glob, os
 replaced = set()
 ROW_SRC = {}
 
+def trim_swing(name):
+    """A swing drawn with a glowing arc: its first frame is clean, so every frame is cut down
+    to about that size, from the feet up and from the hero's back (the arc sweeps in front
+    and overhead)."""
+    fr = run_frames[name]; W1, H1 = fr[0].size; left = name.endswith('L')
+    out = []
+    for f in fr:
+        w, h = f.size
+        box = (max(0, w - round(W1 * 1.15)), max(0, h - round(H1 * 1.08)), w, h) if left else \
+              (0, max(0, h - round(H1 * 1.08)), min(w, round(W1 * 1.15)), h)
+        f = f.crop(box)
+        out.append(f.crop(f.getbbox()))
+    run_frames[name] = out
+
+def drop_scraps(name, keep=0.03):
+    """Keep each frame's hero: drop loose shapes much smaller than it."""
+    out = []
+    for f in run_frames[name]:
+        parts = components(f, 1); big = max(len(c) for c, _, _ in parts)
+        g = Image.new('RGBA', f.size); gp = g.load(); fp = f.load()
+        for c, _, _ in parts:
+            if len(c) >= big * keep:
+                for q in c: gp[q] = fp[q]
+        out.append(g.crop(g.getbbox()))
+    run_frames[name] = out
+
 def trim_streaks(name):
     """A dash drawn with speed lines and dust: its first frame is clean, so every frame is cut
     down to that size around the hero (in front for a side dash, the lines trail behind; around
@@ -394,8 +437,9 @@ def trim_streaks(name):
 # smaller than in every other animation (the up/down/left dashes follow this one)
 ROW_FIX = {'dash': 1.17, 'atk': 1.15}
 # how to clean drawn effects off a row (see cut_sheet): these swings have a real sword
-ROW_COUNT = {'ninja:dash': 5, 'ninja:dashL': 5, 'ninja:dashB': 5, 'ninja:dashF': 5}  # frames, when a row's count can't be told
-ROW_EFFECTS = {'atk': 'arcs', 'atkL': 'arcs', 'ninja:dash': 'hstreaks', 'ninja:dashL': 'hstreaks', 'ninja:dashB': 'vstreaks', 'ninja:dashF': 'vstreaks'}
+ROW_COUNT = {'ninja:atk': 5, 'ninja:atkL': 5, 'ninja:dash': 5, 'ninja:dashL': 5, 'ninja:dashB': 5, 'ninja:dashF': 5}  # frames, when a row's count can't be told
+ROW_EFFECTS = {'atk': 'arcs', 'atkL': 'arcs', 'ninja:dash': 'hstreaks', 'ninja:dashL': 'hstreaks', 'ninja:dashB': 'vstreaks', 'ninja:dashF': 'vstreaks',
+               'ninja:atk': 'redarcs', 'ninja:atkL': 'redarcs'}
 # (right-facing rows first, so the left-facing ones, and the up/down dashes, can match them;
 # and the plain hero's before bald / ninja ones, which are sized to match it)
 def row_order(p):
@@ -423,6 +467,7 @@ for path in sorted(glob.glob('tools/hero-rows/*.png'), key=row_order):
         target = sum(f.height for f in old) / len(old) * old_k
         run_scale[name] = target / (sum(f.height for f in run_frames[name]) / len(run_frames[name])) * ROW_FIX.get(name, 1)
     if ROW_EFFECTS.get(name) in ('hstreaks', 'vstreaks'): trim_streaks(name)
+    if ROW_EFFECTS.get(name) == 'redarcs': drop_scraps(name); trim_swing(name); drop_scraps(name)
     replaced.add(name)
     print('row', name, len(run_frames[name]), 'frames')
 
