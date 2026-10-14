@@ -120,16 +120,23 @@ export function charSprite(look, facing, frame = 0, pose = 'walk') {
   else if (pose === 'atk') kind = ['atkF', 'atkB', 'atk', 'atkL'][facing] || 'atk'; // a swing for each direction
   else if (pose === 'dash') kind = facing === 3 ? 'dashL' : 'dash'; // frame = which dash frame
   else kind = pose;
-  const base = kind;
   // the Ninja outfit (hooded, or on a bald head) and the bald head have their own frame sets
   const ninja = OUTFITS[look.outfit] === 'Ninja';
   const set = ninja ? (look.bald ? 'baldninja:' : 'ninja:') : look.bald ? 'bald:' : '';
+  // poses only the plain hero has (hurt, knocked dizzy or out, victory): bald and ninja
+  // heroes use their own standing frame instead, so they never show the plain hero's hair
+  let lying = false, stars = false;
+  if (set && !hasHeroFrames(set + kind) && OWN_POSE[kind]) {
+    lying = kind === 'down'; stars = kind === 'dizzy';
+    kind = kind === 'hurt' ? (facing === 0 ? 'idleF' : facing === 1 ? 'idleB' : left ? 'idleL' : 'idleR') : OWN_POSE[kind];
+    frame = 0;
+  }
   if (set && hasHeroFrames(set + kind)) kind = set + kind;
   const n = heroFrameCount(kind);
   const index = pose === 'atk' ? Math.min(n - 1, Math.floor(frame * n)) : pose === 'dash' ? Math.min(n - 1, frame) : ((frame % n) + n) % n;
-  const native = NATIVE[base];
+  const native = NATIVE[kind.split(':').pop()];
   const flip = (native === 'left' || native === 'right') && native !== (left ? 'left' : 'right');
-  const key = `${look.skin}${look.hairColor}${look.outfit}${look.outfitColor}${look.bald ? 'b' : ''}|${kind}|${index}|${flip ? 1 : 0}`;
+  const key = `${look.skin}${look.hairColor}${look.outfit}${look.outfitColor}${look.bald ? 'b' : ''}|${kind}|${index}|${flip ? 1 : 0}${lying ? 'z' : stars ? '*' : ''}`;
   let s = charCache.get(key);
   if (!s) {
     const colors = {
@@ -139,7 +146,9 @@ export function charSprite(look, facing, frame = 0, pose = 'walk') {
       outfit: OUTFITS[look.outfit] || OUTFITS[0],
       bald: !!look.bald,
     };
-    const f = heroFrame(colors, kind, index, flip);
+    let f = heroFrame(colors, kind, index, flip);
+    if (lying) f = lieDown(f.img, flip);
+    if (stars) addStars(f.img);
     let red = null;
     s = {
       img: f.img, ox: f.ox, oy: f.oy, w: f.img.width, h: f.img.height,
@@ -151,11 +160,31 @@ export function charSprite(look, facing, frame = 0, pose = 'walk') {
   return s;
 }
 
+const OWN_POSE = { hurt: 'idleF', dizzy: 'idleF', win: 'idleF', down: 'idleR' };
+
+// A standing frame turned on its side (head toward where the hero faced), for knocked out.
+function lieDown(img, flip) {
+  const { c, g } = mk(img.height, img.width);
+  g.translate(c.width / 2, c.height / 2);
+  g.rotate(flip ? -Math.PI / 2 : Math.PI / 2);
+  g.drawImage(img, -img.width / 2, -img.height / 2);
+  return { img: c, ox: Math.floor(c.width / 2), oy: c.height - 1 };
+}
+
+// Little gold stars circling the head, for knocked dizzy.
+function addStars(img) {
+  const g = img.getContext('2d');
+  for (const [x, y] of [[0.2, 1], [0.5, 0], [0.8, 1]]) {
+    const cx = Math.round(x * (img.width - 3)) + 1, cy = y + 1;
+    g.fillStyle = '#ffd040'; g.fillRect(cx - 1, cy, 3, 1); g.fillRect(cx, cy - 1, 1, 3);
+  }
+}
+
 // ---------------------------------------------------------------- Classic Ninja
 // One of the game's original characters (drawn in code, before the sprite sheets): a
-// small ninja with a headband and mask. Drawn at 1.5x so it matches the other heroes
-// (3 detail pixels per art pixel, still crisp). Facing left is the right side mirrored.
-const CLASSIC_SCALE = 1.5;
+// small ninja with a headband and mask. Drawn at 1.75x so it stands as tall as the other
+// heroes (about 32 detail pixels). Facing left is the right side mirrored.
+const CLASSIC_SCALE = 1.75;
 const CLASSIC_HAIR = {
   down: ['..H.H.H.H.', '..HHHHHHH.', '.HHHHHHHH.', '..HHhHhH..', '..H....H..'],
   up: ['..H.H.H.H.', '..HHHHHHH.', '.HHHHHHHH.', '..HHHHHH..', '..HHHHHH..', '..HHHHHH..', '..hHHHHh..'],

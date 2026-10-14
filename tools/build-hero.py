@@ -45,6 +45,9 @@ F = {
  'hurt':  [(62,1060,187,1181)],
 }
 K = 0.2
+# the old poses (hurt, dizzy, knocked out, victory) are drawn with smaller heads than the
+# animation sheets: grow them so the hero stays the same size in every pose
+OLD_FIX = {'hurt': 1.35, 'dizzy': 1.35, 'down': 1.35, 'win': 1.2}
 ROLE = {'keep': 255, 'cloak': 254, 'hair': 253, 'skin': 252, 'tunic': 251}
 
 def classify(r, g, b, x, y, w, h, name):
@@ -80,7 +83,8 @@ for name, boxes in F.items():
     if name.startswith('_'): continue  # old walk cycles, replaced by the run sheet
     for (x0, y0, x1, y1) in boxes:
         c = keep_big(im.crop((x0 - 2, y0 - 2, x1 + 3, y1 + 3)))
-        sm = c.resize((max(1, round(c.width * K)), max(1, round(c.height * K))), Image.BOX)
+        k = K * OLD_FIX.get(name, 1)
+        sm = c.resize((max(1, round(c.width * k)), max(1, round(c.height * k))), Image.BOX)
         px = sm.load()
         for y in range(sm.height):
             for x in range(sm.width):
@@ -320,7 +324,7 @@ run_frames['down'] = [cells[4]]
 run_frames['win'] = [cells[5]]
 for name in ('idleF', 'idleR', 'idleL', 'idleB', 'front', 'side', 'sideL', 'back', 'atk', 'atkL', 'atkF', 'atkB', 'dash', 'dashL', 'dizzy', 'down', 'win', *VARIANT_NAMES):
     for cell in run_frames[name]:
-        k = k_old if name in ('dizzy', 'down', 'win') else run_scale.get(name, k_run)
+        k = k_old * OLD_FIX[name] if name in ('dizzy', 'down', 'win') else run_scale.get(name, k_run)
         sm = cell.resize((max(1, round(cell.width * k)), max(1, round(cell.height * k))), Image.BOX)
         px = sm.load()
         for y in range(sm.height):
