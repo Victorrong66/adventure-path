@@ -294,21 +294,24 @@ k_run = 34 / (sum(f.height for f in run_frames['front']) / len(run_frames['front
 # scaled to the same size as the frames it replaces.
 import glob, os
 replaced = set()
-# (right-facing rows first, so the left-facing ones can match them)
-for path in sorted(glob.glob('tools/hero-rows/*.png'), key=lambda p: p.endswith('L.png')):
+# the old dash frames crouched lower than the new ones: matching their height left the head
+# smaller than in every other animation (the up/down/left dashes follow this one)
+ROW_FIX = {'dash': 1.17}
+# (right-facing rows first, so the left-facing ones, and the up/down dashes, can match them)
+for path in sorted(glob.glob('tools/hero-rows/*.png'), key=lambda p: (p.endswith(('L.png', 'F.png', 'B.png')) and 'dash' in p or p.endswith('L.png'), p)):
     stem = os.path.splitext(os.path.basename(path))[0]
     name = stem.replace('-', ':', 1) if '-' in stem else stem
     old = run_frames.get(name)
     old_k = run_scale.get(name, k_run)
     W0, H0 = Image.open(path).size
     cut_sheet(path, {name: ((0, 0, W0, H0), None, None)}, effects=name.split(':')[-1].startswith(('atk', 'dash')))
-    pair = {'sideL': 'side', 'idleL': 'idleR', 'atkL': 'atk', 'dashL': 'dash'}.get(name.split(':')[-1])
+    pair = {'sideL': 'side', 'idleL': 'idleR', 'atkL': 'atk', 'dashL': 'dash', 'dashF': 'dash', 'dashB': 'dash'}.get(name.split(':')[-1])
     pair = pair and name.replace(name.split(':')[-1], pair)
     if pair in replaced:  # a left-facing row: the same size as its right-facing one
         run_scale[name] = run_scale[pair]
     elif old:
         target = sum(f.height for f in old) / len(old) * old_k
-        run_scale[name] = target / (sum(f.height for f in run_frames[name]) / len(run_frames[name]))
+        run_scale[name] = target / (sum(f.height for f in run_frames[name]) / len(run_frames[name])) * ROW_FIX.get(name, 1)
     replaced.add(name)
     print('row', name, len(run_frames[name]), 'frames')
 
@@ -331,7 +334,8 @@ assert len(cells) == 6, f'expected 6 poses on the bottom row, found {len(cells)}
 run_frames['dizzy'] = [cells[3]]
 run_frames['down'] = [cells[4]]
 run_frames['win'] = [cells[5]]
-for name in ('idleF', 'idleR', 'idleL', 'idleB', 'front', 'side', 'sideL', 'back', 'atk', 'atkL', 'atkF', 'atkB', 'dash', 'dashL', 'dizzy', 'down', 'win', *VARIANT_NAMES):
+BUILT = ['idleF', 'idleR', 'idleL', 'idleB', 'front', 'side', 'sideL', 'back', 'atk', 'atkL', 'atkF', 'atkB', 'dash', 'dashL', 'dizzy', 'down', 'win', *VARIANT_NAMES]
+for name in BUILT + sorted(replaced - set(BUILT)):  # (plus new animations from tools/hero-rows)
     for cell in run_frames[name]:
         k = k_old * OLD_FIX[name] if name in ('dizzy', 'down', 'win') else run_scale.get(name, k_run)
         sm = cell.resize((max(1, round(cell.width * k)), max(1, round(cell.height * k))), Image.BOX)

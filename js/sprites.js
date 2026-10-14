@@ -102,13 +102,13 @@ export const RUN_FRAME_MS = 85; // how long each frame of the run cycle shows
 // Which way each sheet frame faces; anything else is mirrored to fit.
 const NATIVE = {
   front: 'down', back: 'up', side: 'right', sideL: 'left',
-  idleF: 'down', idleB: 'up', idleR: 'right', idleL: 'left', dash: 'right', dashL: 'left',
+  idleF: 'down', idleB: 'up', idleR: 'right', idleL: 'left', dash: 'right', dashL: 'left', dashF: 'down', dashB: 'up',
   atkF: 'down', atkB: 'up', atk: 'right', atkL: 'left', hurt: 'left', down: 'right', dizzy: 'down', win: 'down',
 };
 
 // Heroes (see hero.js). Returns { img, ox, oy, w, h, hurt() }: draw img at
 // w x h at (footX - ox, footY - oy).
-// pose: 'walk' (frame = any running count; RUN_FRAME_MS per frame), 'dash' (frame 0..4), 'idle', 'atk' (frame = swing progress
+// pose: 'walk' (frame = any running count; RUN_FRAME_MS per frame), 'dash' or 'atk' (frame = progress
 // 0..1), 'hurt', 'down' or 'win'.
 export function charSprite(look, facing, frame = 0, pose = 'walk') {
   if (OUTFITS[look.outfit] === 'Classic Ninja') return classicNinja(look, facing, frame, pose);
@@ -118,7 +118,7 @@ export function charSprite(look, facing, frame = 0, pose = 'walk') {
   if (pose === 'walk') kind = facing === 0 ? 'front' : facing === 1 ? 'back' : left ? 'sideL' : 'side';
   else if (pose === 'idle') kind = facing === 0 ? 'idleF' : facing === 1 ? 'idleB' : left ? 'idleL' : 'idleR';
   else if (pose === 'atk') kind = ['atkF', 'atkB', 'atk', 'atkL'][facing] || 'atk'; // a swing for each direction
-  else if (pose === 'dash') kind = facing === 3 ? 'dashL' : 'dash'; // frame = which dash frame
+  else if (pose === 'dash') kind = ['dashF', 'dashB', 'dash', 'dashL'][facing] || 'dash'; // a dash for each direction
   else kind = pose;
   // the Ninja outfit (hooded, or on a bald head) and the bald head have their own frame sets
   const ninja = OUTFITS[look.outfit] === 'Ninja';
@@ -132,8 +132,9 @@ export function charSprite(look, facing, frame = 0, pose = 'walk') {
     frame = 0;
   }
   if (set && hasHeroFrames(set + kind)) kind = set + kind;
+  else if (pose === 'dash' && !hasHeroFrames(set + kind)) kind = set + (left ? 'dashL' : 'dash'); // (no up/down dash drawn for this look)
   const n = heroFrameCount(kind);
-  const index = pose === 'atk' ? Math.min(n - 1, Math.floor(frame * n)) : pose === 'dash' ? Math.min(n - 1, frame) : ((frame % n) + n) % n;
+  const index = pose === 'atk' ? Math.min(n - 1, Math.floor(frame * n)) : pose === 'dash' ? Math.min(n - 1, Math.floor(frame * n)) : ((frame % n) + n) % n;
   const native = NATIVE[kind.split(':').pop()];
   const flip = (native === 'left' || native === 'right') && native !== (left ? 'left' : 'right');
   const key = `${look.skin}${look.hairColor}${look.outfit}${look.outfitColor}${look.bald ? 'b' : ''}|${kind}|${index}|${flip ? 1 : 0}${lying ? 'z' : stars ? '*' : ''}`;
