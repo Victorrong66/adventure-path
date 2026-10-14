@@ -413,8 +413,8 @@ def trim_streaks(name):
     out = []
     for f in fr:
         w, h = f.size; px = f.load()
-        if kind == 'dash': box = (max(0, w - round(W1 * 1.1)), 0, w, h)
-        elif kind == 'dashL': box = (0, 0, min(w, round(W1 * 1.1)), h)
+        if kind == 'dash': box = (max(0, w - round(W1 * 1.3)), 0, w, h)
+        elif kind == 'dashL': box = (0, 0, min(w, round(W1 * 1.3)), h)
         else:
             # the head: the topmost wide part (speed lines above it are thin)
             top = next(y for y in range(h) if sum(1 for x in range(w) if px[x, y][3]) > W1 * 0.3)
