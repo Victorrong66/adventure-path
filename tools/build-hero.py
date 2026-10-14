@@ -153,7 +153,7 @@ def cut_sheet(path, anims, effects=True):
                     seen.add((nx, ny)); st.append((nx, ny))
         return out
     # label boxes: wide, short, dark navy rectangles
-    navy = lambda q: max(q[:3]) <= 70 and q[2] - q[0] >= 6
+    navy = lambda q: max(q[:3]) <= 70 and q[2] - q[0] >= 6 and q[2] >= q[1]  # (not dark green cloaks)
     done = set()
     for y in range(AH):
         for x in range(AW):
@@ -200,7 +200,9 @@ def cut_sheet(path, anims, effects=True):
         return l < 0.22 or (s2 > 0.2 and (hh < 60 or 80 < hh < 170))
 
     for name, ((x0, y0, x1, y1), count, use) in anims.items():
-        inside = lambda q: True
+        if count is None:  # a single-row sheet: the row is wherever the heroes are
+            ys = [y for y in range(y0, y1) if any(ap[x, y][3] for x in range(x0, x1, 2))]
+            y0, y1 = ys[0], ys[-1] + 1
         # connected shapes in the box
         shapes = []; seen = set()
         for y in range(y0, y1):
