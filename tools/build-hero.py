@@ -340,8 +340,8 @@ for path in sorted(glob.glob('tools/hero-rows/*.png'), key=row_order):
     pair = pair and name.replace(name.split(':')[-1], pair)
     plain = name.split(':')[-1]
     avg_h = lambda n: sum(f.height for f in run_frames[n]) / len(run_frames[n])
-    if ':' in name and plain in replaced:  # a bald / ninja row: the plain hero's size
-        target = avg_h(plain) * run_scale[plain] - (2 if path in BLACK_BG else 0)  # (outline drawn on later)
+    if ':' in name and plain in run_frames:  # a bald / ninja row: the plain hero's size
+        target = avg_h(plain) * run_scale.get(plain, k_run) - (2 if path in BLACK_BG else 0)  # (outline drawn on later)
         run_scale[name] = target / avg_h(name)
     elif pair in replaced:  # a left-facing row: the same size as its right-facing one
         run_scale[name] = run_scale[pair]
@@ -385,7 +385,7 @@ for name in BUILT + sorted(replaced - set(BUILT)):  # (plus new animations from 
                 if name.startswith('baldninja:') and role == 'hair': role = 'skin'
                 # the ninja outfit keeps its colours (but hair showing above a headband takes the
                 # player's hair colour)
-                ninja_hair = role == 'hair' and name in replaced and y < sm.height * 0.3
+                ninja_hair = role == 'hair' and name in replaced and y < sm.height * (0.42 if name.endswith(('back', 'idleB')) else 0.3)  # (more hair shows from behind)
                 if name.startswith(('ninja:', 'baldninja:')) and role != 'skin' and not ninja_hair: role = 'keep'
                 px[x, y] = (rr, gg, bb, ROLE[role])
         if ROW_SRC.get(name) in BLACK_BG:  # draw the dark outline back on
