@@ -1,4 +1,4 @@
-# Prompt to rebuild Victor's World
+# Prompt to rebuild Adventure Path
 
 Paste everything below the line into a new Claude Code chat.
 
@@ -8,7 +8,7 @@ and the README); use that design for the Multiplayer section if you rebuild it.
 
 ---
 
-Build a browser game called **Victor's World**: a pixel-art, co-op monster-swarm game (like Vampire Survivors / a "swarm arena") with a top-down three-quarter camera like Stardew Valley. Friends play together in their browsers on computers and phones. It must be a static website (plain HTML, CSS and JavaScript ES modules, no build step) that can be hosted on GitHub Pages.
+Build a browser game called **Adventure Path**: a pixel-art, co-op monster-swarm game (like Vampire Survivors / a "swarm arena") with a top-down three-quarter camera like Stardew Valley. Friends play together in their browsers on computers and phones. It must be a static website (plain HTML, CSS and JavaScript ES modules, no build step) that can be hosted on Cloudflare Workers.
 
 ## Look and feel
 - Camera: top-down three-quarter view like Stardew Valley. Square 16x16 pixel tiles; trees, buildings and characters stand up toward the camera. Depth-sort everything by the y position of its feet so you can walk behind trees and buildings. Tall things (trees, giant mushrooms, the cottage) turn see-through when a player is behind them.

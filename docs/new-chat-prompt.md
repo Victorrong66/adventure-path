@@ -1,18 +1,18 @@
-# Prompt to set up Victor's World in a new repo
+# Prompt to set up Adventure Path in a new repo
 
 Use this when you've made a new GitHub repo and want a new Claude Code chat to put
 this exact game in it (same code, nothing rebuilt). Paste everything below the line.
 
 ---
 
-Set up my browser game **Victor's World** in this repository and publish it with GitHub Pages.
+Set up my browser game **Adventure Path** in this repository and publish it with Cloudflare Workers.
 
 The game is already finished; I want the exact same code, not a rewrite. It's a static
 website (plain HTML, CSS and JavaScript ES modules, no build step). Get the files from
 whichever of these is available:
 
-1. They're already in this repo (I may have uploaded them from `victors-world.zip`), or
-2. They're in my old repo **Victorrong66/victors-world** (branch `main`). If so, add that repo
+1. They're already in this repo (I may have uploaded them from `adventure-path.zip`), or
+2. They're in my repo **Victorrong66/adventure-path** (branch `main`). If so, add that repo
    to this session and copy every file over except the `.git` folder.
 
 The files should be:
@@ -34,7 +34,7 @@ Then:
 4. Tell me step by step how to set up Cloudflare (free plan): make an account, create an API token
    from the "Edit Cloudflare Workers" template, copy the Account ID, add both as GitHub repository
    secrets (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`), then re-run the "Deploy to Cloudflare"
-   workflow. Give me the final link, which will look like `https://victors-world.<subdomain>.workers.dev`.
+   workflow. Give me the final link, which will look like `https://adventure-path.<subdomain>.workers.dev`.
 
 Things to know:
 - Never commit any photos. The Monster Face Photo option keeps the picture only in the host's browser.

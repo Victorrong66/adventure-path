@@ -1,4 +1,4 @@
-# Ember Arena
+# Adventure Path
 
 A pixel-art, top-down (three-quarter view) co-op monster-swarm game that runs in the browser.
 Make your hero, host a world, and have your friends join with a room code to fight
@@ -6,8 +6,9 @@ waves of monsters together.
 
 ## Features
 
-- **Character creator:** 6 skin tones, 8 hair styles, 8 hair colors, 6 outfits (Tunic, Knight,
-  Wizard, Ninja, Hoodie, Overalls) and 8 outfit colors.
+- **Character creator:** 6 skin tones, Spiky or Bald hair, 8 hair colors, 8 outfits
+  (Adventurer, Squire, Apprentice, Ranger, Dragonhide, Royal, Ninja and Classic Ninja),
+  9 outfit colors, and a live animated preview.
 - **Co-op multiplayer (up to 8 players):** one person hosts a world and friends join with a
   5-letter room code or an invite link. The game itself runs on a small server on Cloudflare
   (free plan), so nobody connects to anybody else's device. Each world keeps its room code, so
@@ -48,6 +49,10 @@ waves of monsters together.
 - **Fair spawns:** monsters always appear just off every player's screen, never on top of anyone.
 - **8-bit everything:** pixel art drawn in code, a pixel font, and chiptune music and sound effects.
 
+- **Upgrades:** 7 weapons and 10 passives, each up to level 5. Passives include Lucky Strike,
+  Quick Hands, Greed and Wisdom. After everything is maxed, Power Surge, Toughness and Stride
+  remain available without a level cap.
+
 ## Controls
 
 | Key | Action |
@@ -73,7 +78,7 @@ serves both the website and the game server.
 - **Online:** every push to `main` deploys to Cloudflare through `.github/workflows/deploy.yml`.
   It needs two repository secrets (Settings → Secrets and variables → Actions):
   `CLOUDFLARE_API_TOKEN` (made from the "Edit Cloudflare Workers" template) and
-  `CLOUDFLARE_ACCOUNT_ID`. The game is then at `https://victors-world.<your-subdomain>.workers.dev`.
+  `CLOUDFLARE_ACCOUNT_ID`. The game is then at `https://adventure-path.victorrong68.workers.dev`.
 - **Locally:** `npm install`, then `npm run dev` and open http://localhost:8787.
 
 ### Multiplayer notes
@@ -93,7 +98,7 @@ serves both the website and the game server.
 
 ## Moving to a new repo
 
-`START-HERE-PROMPT.md` has a prompt to paste into a new Claude Code chat, along with this
+`docs/new-chat-prompt.md` has a prompt to paste into a new Claude Code chat, along with this
 game's zip file, to set the game up in a new repo.
 
 ## Rebuilding from scratch

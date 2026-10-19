@@ -82,7 +82,7 @@ export function exportWorld(save) {
 export function importWorld(file) {
   return file.text().then((txt) => {
     const s = JSON.parse(txt);
-    if (!s || typeof s.seed !== 'number' || typeof s.players !== 'object') throw new Error('Not a Victor\'s World save file.');
+    if (!s || typeof s.seed !== 'number' || typeof s.players !== 'object') throw new Error('Not an Adventure Path save file.');
     s.id = s.id || 'w' + Date.now().toString(36);
     s.updated = Date.now();
     storeWorld(s);

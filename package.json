@@ -1,9 +1,9 @@
 {
-  "name": "victors-world",
+  "name": "adventure-path",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev --persist-to ../.victors-world-dev-state",
+    "dev": "wrangler dev --persist-to ../.adventure-path-dev-state",
     "deploy": "wrangler deploy"
   },
   "devDependencies": {

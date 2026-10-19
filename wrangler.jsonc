@@ -1,7 +1,7 @@
 // Cloudflare Workers config: serves the game files and runs the game server.
 // Deploy with `npx wrangler deploy` (the GitHub Action does this on every push to main).
 {
-  "name": "victors-world",
+  "name": "adventure-path",
   "main": "server/worker.js",
   "compatibility_date": "2025-09-01",
   "assets": {

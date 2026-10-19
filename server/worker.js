@@ -1,4 +1,4 @@
-// Victor's World game server (Cloudflare Workers + Durable Objects).
+// Adventure Path game server (Cloudflare Workers + Durable Objects).
 // Each room code gets its own Durable Object (a tiny server that lives on Cloudflare),
 // which runs the game rules from js/sim.js and streams snapshots to everyone in the room.
 // The host's browser still owns the save: the room sends it back to the host as it changes.
